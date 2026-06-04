@@ -12,7 +12,10 @@
 [[headers]]
   for = "/data.js"
   [headers.values]
-    Cache-Control = "public, max-age=86400"
+    # Always revalidate; the DB file below is immutable so this is the only
+    # asset that can change in a deploy. Pay one ~16 KB roundtrip per visit
+    # so users always run the current sql.js shim.
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/"

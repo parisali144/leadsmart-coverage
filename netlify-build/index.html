@@ -205,6 +205,7 @@
   .star.on{color:var(--gold)}
   .pill{background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:6px 12px;font-size:13px;color:var(--ink2)}
   .pill b{color:var(--ink);font-weight:620}
+  .pill-info{background:var(--info);border-color:var(--info-line);color:var(--info-ink);cursor:help}
   .cov{display:inline-flex;align-items:center;gap:7px;background:var(--info);
        border:1px solid var(--info-line);color:var(--info-ink);padding:6px 12px;border-radius:9px;font-size:13px;font-weight:560}
 
@@ -488,7 +489,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="data.js"></script>
+<script src="data.js?v=2026-06-04b"></script>
 <script>
 const $=s=>document.querySelector(s);
 const fmt=n=>n==null?'—':Number(n).toLocaleString();
@@ -781,7 +782,9 @@ function renderNiche(r){
      <span class="pill"><b>${fmt(r.total)}</b> cities</span>
      <span class="pill"><b>${fmt(r.total_zips)}</b> ZIPs in view</span>
      ${ntTotal?`<span class="pill">niche total <b>${fmt(ntTotal.zips)}</b> ZIPs · top ${usd0(ntTotal.top_payout)}</span>`:''}
-     <span class="pill">showing ${from}–${to}</span></div>`;
+     <span class="pill">showing ${from}–${to}</span>
+     ${r.filters_bypassed?`<span class="pill pill-info" title="Your active filters (population, payout, etc.) were bypassed so the city search could return matches. Clear the search to re-apply them.">filters bypassed for search</span>`:''}
+     </div>`;
   const cols = 7 + (showProfit?1:0);
   h+=`<div class="hint-line">Click any row to see its ZIPs and individual payouts.</div>`;
   h+=`<div class="tablecard"><table><thead><tr>

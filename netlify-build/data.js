@@ -206,10 +206,23 @@
   const DENSITY_BANDS = { urban: [1000, 1e9], suburban: [200, 1000], rural: [0, 200] };
 
   function nicheCities(q) {
+    // City name search ("Find a city" box) is a "find by name" lookup, not
+    // a refinement filter. When the user types in it we bypass the numeric
+    // population / payout / ZIP / density filters so the city they typed
+    // actually appears — even if some active preset (e.g. Top picks with
+    // max_pop=50k) would otherwise hide it. State filter is kept because
+    // it's geographic, not size-based.
+    const cityQ = (q.q || '').trim();
+    const hasCityQ = cityQ.length > 0;
+
     const where = ['niche=?', 'payout_type=?', 'city IS NOT NULL', 'state_id IS NOT NULL'];
     const args = [q.niche || '', q.ptype || 'CPL'];
     if (q.state) { where.push('state_id=?'); args.push(q.state.toUpperCase()); }
-    if (q.q) { where.push('city LIKE ? COLLATE NOCASE'); args.push(q.q + '%'); }
+    if (hasCityQ) {
+      // contains-match (was prefix), so "york" finds "New York" and "York"
+      where.push('city LIKE ? COLLATE NOCASE');
+      args.push('%' + cityQ + '%');
+    }
     const sql = `SELECT city,state_id,
                         MAX(payout) payout, AVG(payout) avg_payout, MIN(payout) min_payout,
                         COUNT(DISTINCT zip) zips, MAX(population) population,
@@ -221,18 +234,25 @@
     const minPop = intnum(q.min_pop), maxPop = intnum(q.max_pop);
     const minZ = intnum(q.min_zips);
     const dband = DENSITY_BANDS[(q.density || '').toLowerCase()];
+    const numericFiltersActive =
+      minPay != null || maxPay != null || minPop != null || maxPop != null || minZ != null || !!dband;
+
     const states = new Set();
     let totalZips = 0;
 
     const out = [];
     for (const r of all) {
       states.add(r.state_id);
-      if (minPay != null && r.payout < minPay) continue;
-      if (maxPay != null && r.payout > maxPay) continue;
-      if (maxPop != null && (r.population || 0) > maxPop) continue;
-      if (minPop != null && (r.population || 0) < minPop) continue;
-      if (minZ != null && r.zips < minZ) continue;
-      if (dband) { const d = r.density || 0; if (!(d >= dband[0] && d < dband[1])) continue; }
+      // When city search is active, skip the numeric/density filters so the
+      // user finds the city by name regardless of which preset is applied.
+      if (!hasCityQ) {
+        if (minPay != null && r.payout < minPay) continue;
+        if (maxPay != null && r.payout > maxPay) continue;
+        if (maxPop != null && (r.population || 0) > maxPop) continue;
+        if (minPop != null && (r.population || 0) < minPop) continue;
+        if (minZ != null && r.zips < minZ) continue;
+        if (dband) { const d = r.density || 0; if (!(d >= dband[0] && d < dband[1])) continue; }
+      }
       r.avg_payout = r.avg_payout ? Math.round(r.avg_payout * 100) / 100 : null;
       r.density = r.density ? Math.round(r.density) : null;
       r.score = score(r.payout, r.zips, r.population);
@@ -264,7 +284,8 @@
     return {
       niche: q.niche || '', payout_type: q.ptype || 'CPL', total: out.length,
       total_zips: totalZips, states: [...states].sort(),
-      cities: out.slice(offset, offset + limit), offset, limit
+      cities: out.slice(offset, offset + limit), offset, limit,
+      filters_bypassed: hasCityQ && numericFiltersActive,
     };
   }
 

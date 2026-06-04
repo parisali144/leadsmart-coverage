@@ -1,0 +1,67 @@
+name: Daily data refresh
+
+# Fires every day at 14:00 UTC (≈ 9:00 AM EST / 8:00 AM CST + 1 hr,
+# giving LeadSmart's 8 AM CST cron a 1-hour buffer to finish).
+# Also runnable on demand from the Actions tab via workflow_dispatch.
+on:
+  schedule:
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    name: Sync from Supabase and deploy to Netlify
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    env:
+      NETLIFY_SITE_ID: 021639a8-b4f0-46e6-8017-403569a56e1f
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Sync LeadSmart top_bids from Supabase
+        working-directory: app
+        run: |
+          python sync_supabase.py
+          echo "----"
+          ls -lh leadsmart.db
+
+      - name: Assemble deploy zip
+        run: |
+          mkdir -p dist
+          cp netlify-build/index.html      dist/
+          cp netlify-build/data.js         dist/
+          cp netlify-build/netlify.toml    dist/
+          cp netlify-build/favicon.svg     dist/
+          cp app/leadsmart.db              dist/
+          cd dist
+          zip -r9 ../deploy.zip .
+          cd ..
+          ls -lh deploy.zip
+
+      - name: Deploy to Netlify
+        env:
+          NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
+        run: |
+          if [ -z "$NETLIFY_TOKEN" ]; then
+            echo "::error::NETLIFY_TOKEN secret is missing. Add it under repo Settings → Secrets → Actions."
+            exit 1
+          fi
+          response=$(curl -fsS -X POST \
+            "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE_ID}/deploys" \
+            -H "Authorization: Bearer ${NETLIFY_TOKEN}" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@deploy.zip")
+          echo "$response" | python -c "import sys,json;d=json.load(sys.stdin);print('deploy_id:',d.get('id'));print('state:',d.get('state'));print('url:',d.get('ssl_url'))"
+
+      - name: Verify the live site responds 200
+        run: |
+          sleep 25
+          curl -sSf -o /dev/null -w "homepage: %%{http_code}\n" "https://leadsmart-coverage.netlify.app/"

@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeadSmart Coverage Intelligence</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
+<meta name="theme-color" content="#1c2433">
+<style>
+  :root{
+    /* RankLocal palette (ranklocal.cc dark theme) */
+    --bg:#1c2433; --bg2:#222a3b; --panel:#2a3040; --panel2:#2f3548; --elevated:#353c50;
+    --line:#3d4354; --line2:#474e62;
+    --ink:#e8eaee; --ink2:#a3a3a3; --ink3:#727a8c;
+    --acc:#e05d38; --acc-d:#c64e2c; --acc-soft:rgba(224,93,56,.13); --acc-line:rgba(224,93,56,.36);
+    --info:#2a3656; --info-line:#3a4a72; --info-ink:#bfdbfe;
+    --good:#46b17f; --bad:#ef4444;
+    --gold:#eaa83a; --violet:#9a86ff;
+    --shadow:0 1px 2px rgba(0,0,0,.32),0 14px 40px rgba(0,0,0,.40);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-font-smoothing:antialiased}
+  body{margin:0;color:var(--ink);font-size:15px;line-height:1.55;
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif;
+       background:
+         radial-gradient(1000px 560px at 88% -10%, rgba(224,93,56,.08), transparent 60%),
+         radial-gradient(800px 520px at -5% 0%, rgba(42,54,86,.45), transparent 55%),
+         var(--bg);
+       min-height:100vh}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 28px 100px}
+  a{color:inherit}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 0 0;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:13px}
+  .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(140deg,var(--acc),var(--acc-d));
+        display:grid;place-items:center;font-weight:800;color:#fff;font-size:19px;box-shadow:0 6px 18px rgba(224,93,56,.32)}
+  h1{margin:0;font-size:20px;font-weight:680;letter-spacing:-.01em}
+  .brand .sub{color:var(--ink2);font-size:13px;margin-top:1px}
+  .hstat{display:flex;gap:26px}
+  .hstat .s{text-align:right}
+  .hstat .n{font-size:18px;font-weight:680;font-variant-numeric:tabular-nums}
+  .hstat .l{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+
+  .maintabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);
+            border-radius:13px;padding:5px;width:fit-content;box-shadow:var(--shadow)}
+  .maintabs button{background:none;border:0;padding:10px 18px;border-radius:9px;cursor:pointer;
+       color:var(--ink2);font-size:14px;font-weight:560;transition:all .15s}
+  .maintabs button:hover{color:var(--ink)}
+  .maintabs button.on{background:var(--elevated);color:var(--ink);box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
+
+  input,select{background:var(--bg2);border:1px solid var(--line2);color:var(--ink);
+       padding:11px 13px;border-radius:10px;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s}
+  input::placeholder{color:var(--ink3)}
+  input:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+  select{cursor:pointer}
+  .btn{background:linear-gradient(140deg,var(--acc),var(--acc-d));border:0;color:#fff;padding:11px 18px;
+       border-radius:10px;cursor:pointer;font-size:14px;font-weight:640;transition:filter .15s,transform .05s}
+  .btn:hover{filter:brightness(1.07)} .btn:active{transform:translateY(1px)}
+  .btn:disabled{opacity:.35;cursor:default;filter:none}
+  .btn.ghost{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);font-weight:540}
+  .btn.ghost:hover{border-color:var(--ink3);filter:none;background:var(--elevated)}
+  .btn.sm{padding:8px 13px;font-size:13px}
+
+  .searchbar{position:relative;display:flex;gap:12px;align-items:center;margin-top:28px;flex-wrap:wrap}
+  .field{position:relative;flex:1;min-width:300px}
+  .field input{width:100%;padding:14px 16px;font-size:15px;background:var(--panel)}
+  .seg{display:inline-flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+  .seg button{background:none;border:0;color:var(--ink2);padding:9px 14px;border-radius:8px;cursor:pointer;font-size:13.5px;font-weight:540}
+  .seg button:hover{color:var(--ink)}
+  .seg button.on{background:var(--elevated);color:var(--ink)}
+
+  .ac{position:absolute;top:56px;left:0;right:0;background:var(--panel2);border:1px solid var(--line2);
+      border-radius:12px;z-index:40;overflow:hidden;box-shadow:var(--shadow)}
+  .ac div{padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;font-size:14.5px;border-bottom:1px solid var(--line)}
+  .ac div:last-child{border-bottom:0}
+  .ac div:hover,.ac div.sel{background:var(--elevated)}
+  .ac .tag{color:var(--ink3);font-size:12.5px}
+
+  .recent{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .recent .rl{font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em}
+  .chip{background:var(--panel);border:1px solid var(--line2);color:var(--ink2);padding:6px 11px;border-radius:8px;
+        font-size:13px;cursor:pointer}
+  .chip:hover{border-color:var(--acc-line);color:var(--ink)}
+
+  .section-label{font-size:11.5px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin:30px 0 12px}
+
+  /* === By-Niche: sidebar + main layout === */
+  .niche-layout{display:grid;grid-template-columns:268px 1fr;gap:22px;margin-top:14px;align-items:start}
+  .niche-sidebar{position:sticky;top:14px;max-height:calc(100vh - 28px);overflow-y:auto;
+                 background:var(--panel);border:1px solid var(--line);border-radius:13px;
+                 padding:14px 14px 16px;box-shadow:var(--shadow);
+                 scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+  .niche-sidebar::-webkit-scrollbar{width:6px}
+  .niche-sidebar::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+  .niche-main{min-width:0}
+  /* Tabs row: tabs on the left, the persistent RankLocal CTA on the right */
+  .tabs-row{display:flex;align-items:center;justify-content:space-between;gap:18px;
+            margin:18px 0 0;flex-wrap:wrap}
+  .tabs-row .maintabs{margin:0}
+
+  /* Persistent RankLocal CTA — distinctive, always visible top-right */
+  .rl-cta{display:inline-flex;align-items:center;gap:12px;
+          background:linear-gradient(135deg,var(--acc) 0%,var(--acc-d) 100%);
+          color:#fff;text-decoration:none;padding:9px 16px 9px 12px;border-radius:12px;
+          box-shadow:0 10px 28px rgba(224,93,56,.32),0 0 0 1px rgba(255,255,255,.06) inset;
+          transition:filter .15s,transform .08s,box-shadow .2s;position:relative;overflow:hidden}
+  .rl-cta::before{content:'';position:absolute;inset:-50% -10% auto auto;width:60%;height:120%;
+                  background:radial-gradient(circle,rgba(255,255,255,.18),transparent 65%);pointer-events:none}
+  .rl-cta:hover{filter:brightness(1.06);box-shadow:0 14px 36px rgba(224,93,56,.42),0 0 0 1px rgba(255,255,255,.08) inset}
+  .rl-cta:active{transform:translateY(1px)}
+  .rl-spark{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+            background:rgba(255,255,255,.16);font-size:15px;line-height:1;
+            text-shadow:0 0 12px rgba(255,255,255,.6)}
+  .rl-text{display:flex;flex-direction:column;line-height:1.15}
+  .rl-eyebrow{font-size:10.5px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;opacity:.78}
+  .rl-main{font-size:13.5px;font-weight:680;letter-spacing:-.005em}
+  .rl-arrow{font-size:17px;line-height:1;margin-left:2px}
+  @media(max-width:560px){
+    .tabs-row{gap:10px}
+    .rl-eyebrow{display:none}
+    .rl-main{font-size:12.5px}
+  }
+  .sb-group{margin-bottom:16px}
+  .sb-group:last-of-type{margin-bottom:10px}
+  .sb-label{font-size:10.5px;font-weight:680;letter-spacing:.08em;text-transform:uppercase;
+            color:var(--ink3);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .sb-input{background:var(--bg2);border:1px solid var(--line2);color:var(--ink);
+            padding:9px 11px;font-size:13.5px;border-radius:8px;width:100%;margin-bottom:7px}
+  .sb-input:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+  .sb-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .sb-pair:last-child{margin-bottom:0}
+  .sb-pair .fg input,.sb-pair .fg select{background:var(--bg2);border:1px solid var(--line2);color:var(--ink);
+            padding:8px 10px;font-size:13px;border-radius:7px;width:100%}
+  .sb-pair .fg label{font-size:11px;color:var(--ink2);font-weight:540;margin-bottom:3px;display:block}
+  .sb-reset{width:100%;padding:9px}
+
+  .niche-select{font-size:14px;font-weight:600;color:var(--ink);background:var(--bg2);
+                border:1px solid var(--line2);padding:10px 34px 10px 12px;border-radius:8px;
+                width:100%;cursor:pointer;margin-bottom:8px;
+                background-image:linear-gradient(45deg,transparent 50%,var(--ink2) 50%),linear-gradient(135deg,var(--ink2) 50%,transparent 50%);
+                background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;
+                background-size:5px 5px,5px 5px;background-repeat:no-repeat;-webkit-appearance:none;appearance:none}
+  .ptype-full{display:flex;gap:2px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:3px;width:100%}
+  .ptype-full button{flex:1;background:none;border:0;color:var(--ink2);padding:7px 0;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:540}
+  .ptype-full button.on{background:var(--elevated);color:var(--acc)}
+
+  .niche-stat-card{margin-top:9px;padding:9px 11px;background:var(--bg2);border:1px solid var(--line);
+                   border-radius:8px;font-size:12px;color:var(--ink2);line-height:1.55;font-variant-numeric:tabular-nums}
+  .niche-stat-card b{color:var(--ink);font-weight:600}
+  .niche-stat-card .dot-sep{color:var(--ink3);margin:0 5px}
+
+  /* quick views — vertical inside sidebar */
+  .quick-views{display:flex;flex-wrap:wrap;gap:6px}
+  .quick-views.vertical{flex-direction:column}
+  .qv{background:var(--bg2);border:1px solid var(--line2);color:var(--ink);
+      padding:8px 11px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:540;
+      display:flex;align-items:center;gap:9px;transition:all .12s;text-align:left;width:100%}
+  .qv:hover{border-color:var(--acc-line);background:var(--panel2)}
+  .qv.on{background:var(--acc-soft);border-color:var(--acc);color:var(--acc)}
+  .qv-ico{width:22px;height:22px;border-radius:6px;background:var(--panel);border:1px solid var(--line2);
+          display:grid;place-items:center;color:var(--acc);font-size:13px;font-weight:600;flex:0 0 auto}
+  .qv.on .qv-ico{background:var(--acc);color:#fff;border-color:var(--acc)}
+
+  /* sort grid — 2x2 inside sidebar */
+  .sort-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--bg2);
+             border:1px solid var(--line2);border-radius:8px;padding:3px}
+  .sort-grid button{background:none;border:0;color:var(--ink2);padding:8px 6px;border-radius:6px;
+                    cursor:pointer;font-size:12.5px;font-weight:540}
+  .sort-grid button:hover{color:var(--ink)}
+  .sort-grid button.on{background:var(--elevated);color:var(--acc)}
+
+  /* mobile — stack sidebar above main */
+  @media(max-width:880px){
+    .niche-layout{grid-template-columns:1fr}
+    .niche-sidebar{position:static;max-height:none}
+  }
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:16px 20px;align-items:flex-end;margin-top:22px;
+           padding:20px 22px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .fg{display:flex;flex-direction:column;gap:6px}
+  .fg label{font-size:11.5px;color:var(--ink2);font-weight:540;letter-spacing:.01em}
+  .fg input{width:128px} .fg input.sm{width:100px} .fg select{min-width:120px}
+  .ptype-toggle{display:inline-flex;gap:2px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;padding:3px}
+  .ptype-toggle button{background:none;border:0;color:var(--ink2);padding:8px 14px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:540}
+  .ptype-toggle button.on{background:var(--elevated);color:var(--acc)}
+  .toolbar .spacer{flex:1}
+  .morelink{background:none;border:0;color:var(--acc);cursor:pointer;font-size:13.5px;font-weight:560;padding:8px 0}
+  .advanced{display:flex;flex-wrap:wrap;gap:16px 20px;align-items:flex-end;width:100%;margin-top:2px;
+            padding-top:18px;border-top:1px dashed var(--line2)}
+
+  .presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+  .presets .pp{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);padding:9px 14px;border-radius:10px;
+       cursor:pointer;font-size:13px;font-weight:520;display:inline-flex;gap:8px;align-items:center}
+  .presets .pp:hover{border-color:var(--acc-line)}
+  .presets .pp .d{color:var(--ink3);font-size:12px}
+
+  .controls{display:flex;gap:14px;align-items:center;margin:24px 0 2px;flex-wrap:wrap}
+  .controls .lbl{color:var(--ink2);font-size:13.5px;font-weight:520}
+
+  .hero{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+  .hero .big{font-size:18px;font-weight:680;letter-spacing:-.01em;margin-right:2px;display:flex;align-items:center;gap:10px}
+  .star{cursor:pointer;color:var(--ink3);font-size:19px;line-height:1}
+  .star.on{color:var(--gold)}
+  .pill{background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:6px 12px;font-size:13px;color:var(--ink2)}
+  .pill b{color:var(--ink);font-weight:620}
+  .cov{display:inline-flex;align-items:center;gap:7px;background:var(--info);
+       border:1px solid var(--info-line);color:var(--info-ink);padding:6px 12px;border-radius:9px;font-size:13px;font-weight:560}
+
+  .tablecard{margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px 16px;text-align:left;font-size:14px}
+  thead th{color:var(--ink3);font-weight:620;font-size:11.5px;letter-spacing:.04em;cursor:pointer;
+           user-select:none;white-space:nowrap;background:var(--bg2);border-bottom:1px solid var(--line2)}
+  thead th:hover{color:var(--ink2)}
+  tbody td{border-bottom:1px solid var(--line)}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover td{background:var(--panel2)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .niche-name{font-weight:560}
+  .ptype{font-size:11px;color:var(--ink2);background:var(--elevated);padding:2px 8px;border-radius:6px;margin-left:9px;font-weight:540}
+  .pay{font-weight:680;font-variant-numeric:tabular-nums}
+  .range{display:block;font-size:11.5px;color:var(--ink3);font-weight:500;margin-top:1px}
+  /* clickable row affordance + chevron */
+  tbody tr.city-row{cursor:pointer}
+  tbody tr.city-row .row-car{color:var(--acc);font-size:11px;display:inline-block;
+       transition:transform .15s;margin-right:8px;opacity:.65}
+  tbody tr.city-row:hover{background:var(--panel2)}
+  tbody tr.city-row:hover .row-car{opacity:1}
+  tbody tr.city-row.open{background:var(--panel2)}
+  tbody tr.city-row.open .row-car{transform:rotate(90deg);opacity:1}
+  .hint-line{color:var(--ink3);font-size:12px;margin:6px 2px 0;display:flex;align-items:center;gap:6px}
+  .hint-line::before{content:'›';color:var(--acc);font-size:14px}
+  .zdetail td{background:var(--bg2);padding:0}
+  .zwrap{padding:14px 18px}
+  .zhead{font-size:12.5px;color:var(--ink2);margin-bottom:10px;display:flex;align-items:center;gap:12px}
+  .zcopy{cursor:pointer;color:var(--acc);font-weight:560}
+  .zcopy:hover{text-decoration:underline}
+  .zgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:7px}
+  .zchip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
+         border-radius:8px;padding:7px 10px;font-size:13px}
+  .zc-zip{font-variant-numeric:tabular-nums;color:var(--ink2);min-width:46px}
+  .zc-bar{height:6px;border-radius:3px;background:var(--acc);flex:0 0 auto;opacity:.55}
+  .zc-pay{margin-left:auto;font-weight:680;font-variant-numeric:tabular-nums}
+  .profit{font-weight:680;font-variant-numeric:tabular-nums}
+  .profit.pos{color:var(--good)} .profit.neg{color:var(--bad)}
+  .rank{color:var(--ink3);font-variant-numeric:tabular-nums;width:30px;font-size:13px}
+  .citylink{color:var(--acc);cursor:pointer;font-weight:560}
+  .citylink:hover{text-decoration:underline}
+  .county,.dim{color:var(--ink3);font-size:13px}
+  .sc{font-weight:680;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:7px;justify-content:flex-end}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .sc.t3 .dot{background:var(--acc)} .sc.t3{color:#ec7e60}
+  .sc.t2 .dot{background:#9a6f8f} .sc.t2{color:#b79bb0}
+  .sc.t1 .dot{background:#4a5266} .sc.t1{color:var(--ink2)}
+
+  .bundle{margin-top:18px;background:linear-gradient(120deg,var(--acc-soft),rgba(42,54,86,.5));
+          border:1px solid var(--line2);border-radius:var(--radius);padding:16px 20px}
+  .bundle h3{margin:0 0 5px;font-size:14.5px;font-weight:640}
+  .bundle .combo{font-size:13.5px;color:var(--ink2)}
+  .bundle b{color:var(--acc)}
+
+  .empty{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow)}
+  .empty h3{margin:0 0 8px;font-size:17px;font-weight:600}
+  .empty .lbl{color:var(--ink2);font-size:14px}
+  .near{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+  .near a{cursor:pointer;background:var(--panel2);border:1px solid var(--line2);padding:9px 13px;border-radius:10px;font-size:13.5px;color:var(--ink);text-decoration:none}
+  .near a:hover{border-color:var(--acc-line)}
+  .near .tag{color:var(--ink3);font-size:12.5px}
+
+  .row-actions{display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;align-items:center}
+  .row-actions .lbl{color:var(--ink2);font-size:13.5px}
+  .pager{display:flex;gap:12px;align-items:center;margin-top:18px;color:var(--ink2);font-size:13.5px}
+  .pager .count{color:var(--ink3)}
+
+  .info{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--ink3);
+        color:var(--ink3);font-size:10px;cursor:help;margin-left:6px;font-style:normal;font-weight:700;vertical-align:middle}
+  .info:hover{border-color:var(--acc);color:var(--acc)}
+
+  /* calculator panel */
+  .calc{margin-top:18px;background:var(--panel);border:1px solid var(--line2);border-radius:var(--radius);padding:16px 20px;
+        display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;box-shadow:var(--shadow)}
+  .calc .title{font-size:13px;font-weight:620;color:var(--ink);display:flex;align-items:center;gap:8px}
+  .calc .fg input{width:96px}
+  .calc .note{color:var(--ink3);font-size:12.5px;max-width:280px}
+
+  /* state grid */
+  .stategrid{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+  .stategrid button{background:var(--panel);border:1px solid var(--line2);color:var(--ink2);width:50px;
+       padding:9px 0;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;text-align:center}
+  .stategrid button:hover{border-color:var(--acc-line);color:var(--ink)}
+  .stategrid button.on{background:var(--acc-soft);border-color:var(--acc-line);color:var(--acc)}
+
+  .foot{color:var(--ink3);font-size:12.5px;margin-top:42px;padding-top:22px;border-top:1px solid var(--line);text-align:center}
+  .hide{display:none}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--elevated);
+         border:1px solid var(--acc-line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:14px;
+         box-shadow:var(--shadow);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:90}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+  @media(max-width:720px){
+    .wrap{padding:0 18px 80px}
+    .hstat{display:none}
+    th.opt,td.opt{display:none}
+    .fg input{width:100%}
+  }
+  /* boot screen — shown while sql.js + DB load */
+  #boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:200;transition:opacity .35s}
+  #boot .bx{text-align:center;max-width:360px;padding:0 20px}
+  #boot .lg{width:56px;height:56px;border-radius:14px;background:linear-gradient(140deg,var(--acc),var(--acc-d));
+           display:grid;place-items:center;font-weight:800;color:#fff;font-size:24px;margin:0 auto 20px;
+           box-shadow:0 8px 28px rgba(224,93,56,.35)}
+  #boot h2{margin:0 0 6px;font-size:19px;font-weight:640}
+  #boot p{color:var(--ink2);font-size:13.5px;margin:0 0 20px}
+  #boot .br{width:280px;height:6px;background:var(--panel);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin:0 auto}
+  #boot .br i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--acc),var(--acc-d));transition:width .15s}
+  #boot .pct{font-size:12.5px;color:var(--ink3);margin-top:9px;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div id="boot">
+  <div class="bx">
+    <div class="lg">L</div>
+    <h2>Loading coverage data…</h2>
+    <p>One-time download of the LeadSmart payout database. Cached after — instant on every visit after this.</p>
+    <div class="br"><i id="boot-bar"></i></div>
+    <div class="pct"><span id="boot-pct">0 MB</span> / ~41 MB</div>
+  </div>
+</div>
+<div class="wrap">
+<header>
+  <div class="brand">
+    <div class="logo">L</div>
+    <div>
+      <h1>LeadSmart <span style="color:var(--acc)">Coverage Intelligence</span></h1>
+      <div class="sub">Market research for lead-gen — coverage, payouts, ZIPs & profit</div>
+    </div>
+  </div>
+  <div class="hstat" id="hstat"></div>
+</header>
+
+<div class="tabs-row">
+  <div class="maintabs">
+    <button data-tab="city" class="on">By city</button>
+    <button data-tab="niche">By niche</button>
+    <button data-tab="state">By state</button>
+    <button data-tab="bundles">Bundles</button>
+    <button data-tab="saved">Saved</button>
+  </div>
+  <a class="rl-cta" href="https://ranklocal.cc" target="_blank" rel="noopener"
+     title="Open RankLocal in a new tab to build a lead-gen site for this niche">
+    <span class="rl-spark">✦</span>
+    <span class="rl-text">
+      <span class="rl-eyebrow">Next step</span>
+      <span class="rl-main">Build a site in RankLocal</span>
+    </span>
+    <span class="rl-arrow">→</span>
+  </a>
+</div>
+
+<!-- ============ BY CITY ============ -->
+<div id="tab-city">
+  <div class="searchbar">
+    <div class="field">
+      <input id="q" placeholder="Search a city, e.g. Cave Creek — or a ZIP, e.g. 85331" autocomplete="off">
+      <div id="ac" class="ac hide"></div>
+    </div>
+    <div class="seg" id="mode"><button data-m="city" class="on">City</button><button data-m="zip">ZIP</button></div>
+    <button class="btn" id="go">Check</button>
+  </div>
+  <div class="recent hide" id="recent"></div>
+  <div id="cityResult"></div>
+</div>
+
+<!-- ============ BY NICHE ============ -->
+<div id="tab-niche" class="hide">
+  <div class="niche-layout">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="niche-sidebar">
+
+      <div class="sb-group">
+        <div class="sb-label">Niche</div>
+        <select id="nichePick" class="niche-select"></select>
+        <div class="ptype-toggle ptype-full" id="ptypeToggle"></div>
+        <div class="niche-stat-card" id="nicheStat"></div>
+      </div>
+
+      <div class="sb-group">
+        <div class="sb-label">Quick view</div>
+        <div class="quick-views vertical" id="presets">
+          <button class="qv on" data-preset="gems" title="Top payout in small markets (pop < 50k)">
+            <span class="qv-ico">★</span><span>Top picks</span></button>
+          <button class="qv" data-preset="supply" title="Most ZIPs at the top-tier payout">
+            <span class="qv-ico">⊕</span><span>Max supply</span></button>
+          <button class="qv" data-preset="metro" title="Population > 250k with highest payouts">
+            <span class="qv-ico">▣</span><span>Big metros</span></button>
+          <button class="qv" data-preset="multizip" title="3+ ZIPs per city">
+            <span class="qv-ico">≡</span><span>Multi-ZIP</span></button>
+          <button class="qv" data-preset="all" title="No filter — browse all">
+            <span class="qv-ico">⌕</span><span>All cities</span></button>
+        </div>
+      </div>
+
+      <div class="sb-group">
+        <div class="sb-label">Sort</div>
+        <div class="seg sort-grid" id="npreset">
+          <button data-k="score" class="on">Best fit</button>
+          <button data-k="payout">Payout</button>
+          <button data-k="population">Smallest</button>
+          <button data-k="zips">Most ZIPs</button>
+        </div>
+      </div>
+
+      <div class="sb-group">
+        <div class="sb-label">Location</div>
+        <select id="fState" class="sb-input"><option value="">All states</option></select>
+        <input id="fCity" class="sb-input" placeholder="Find a city…">
+      </div>
+
+      <div class="sb-group">
+        <div class="sb-label">Filters</div>
+        <div class="sb-pair">
+          <div class="fg"><label>Min payout ($)</label><input id="fMinPay" type="number" placeholder="0"></div>
+          <div class="fg"><label>Max payout ($)</label><input id="fMaxPay" type="number" placeholder="any"></div>
+        </div>
+        <div class="sb-pair">
+          <div class="fg"><label>Min population</label><input id="fMinPop" type="number" placeholder="0"></div>
+          <div class="fg"><label>Max population</label><input id="fMaxPop" type="number" placeholder="any"></div>
+        </div>
+        <div class="sb-pair">
+          <div class="fg"><label>Min ZIPs</label><input id="fMinZip" type="number" placeholder="1"></div>
+          <div class="fg"><label>Density</label><select id="fDensity">
+            <option value="">Any</option><option value="urban">Urban</option>
+            <option value="suburban">Suburban</option><option value="rural">Rural</option></select></div>
+        </div>
+      </div>
+
+      <div class="sb-group">
+        <div class="sb-label">
+          Profit estimator
+          <span class="info" title="Profit per lead = payout − (your CPC × clicks per lead). Adds a profit column to the table.">i</span>
+        </div>
+        <div class="sb-pair">
+          <div class="fg"><label>Your CPC ($)</label><input id="cCPC" type="number" step="0.5" placeholder="off"></div>
+          <div class="fg"><label>Clicks / lead</label><input id="cCPL" type="number" step="1" placeholder="15"></div>
+        </div>
+      </div>
+
+      <button class="btn ghost sb-reset" id="fReset">Reset all</button>
+    </aside>
+
+    <!-- RIGHT MAIN -->
+    <main class="niche-main" id="nicheResult"></main>
+  </div>
+</div>
+
+<!-- ============ BY STATE ============ -->
+<div id="tab-state" class="hide">
+  <div class="section-label">Choose a state</div>
+  <div class="stategrid" id="stategrid"></div>
+  <div id="stateResult"></div>
+</div>
+
+<!-- ============ BUNDLES ============ -->
+<div id="tab-bundles" class="hide">
+  <div class="section-label">Stackable markets — cities where multiple niches cover the same ZIP</div>
+  <div class="toolbar">
+    <div class="fg"><label>State</label><select id="bState"><option value="">All states</option></select></div>
+    <div class="fg"><label>Min niches sharing a ZIP</label><select id="bMinNiche">
+      <option value="2">2+</option><option value="3" selected>3+</option><option value="4">4+</option>
+      <option value="5">5+</option><option value="6">6+</option></select></div>
+    <div class="fg"><label>Min population</label><input id="bMinPop" type="number" placeholder="0"></div>
+    <div class="fg"><label>Sort</label><select id="bSort">
+      <option value="combined">Combined payout</option><option value="niches">Niche count</option>
+      <option value="population">Smallest market</option></select></div>
+  </div>
+  <div id="bundleResult"></div>
+</div>
+
+<!-- ============ SAVED ============ -->
+<div id="tab-saved" class="hide">
+  <div class="section-label">Your saved markets</div>
+  <div id="savedResult"></div>
+</div>
+
+<div class="foot" id="foot"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="data.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const fmt=n=>n==null?'—':Number(n).toLocaleString();
+const usd=n=>n==null?'—':'$'+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const usd0=n=>n==null?'—':'$'+Number(n).toLocaleString(undefined,{maximumFractionDigits:0});
+/* j() is defined by data.js (sql.js client-side data layer) */
+let META=null;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1600);}
+
+/* localStorage helpers */
+const LS={get:(k,d)=>{try{return JSON.parse(localStorage.getItem('ls_'+k))??d}catch(e){return d}},
+          set:(k,v)=>localStorage.setItem('ls_'+k,JSON.stringify(v))};
+
+/* main tabs */
+document.querySelectorAll('.maintabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.maintabs button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');const t=b.dataset.tab;
+  ['city','niche','state','bundles','saved'].forEach(x=>$('#tab-'+x).classList.toggle('hide',x!==t));
+  if(t==='niche'&&!NICHE.loaded)initNiche();
+  if(t==='state'&&!STATE.loaded)initState();
+  if(t==='bundles'&&!BUN.loaded)initBundles();
+  if(t==='saved')renderSaved();
+});
+
+/* ===================== BY CITY ===================== */
+let CURRENT=null,SORT={key:'score',dir:-1},acItems=[],acSel=-1,searchMode='city';
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#mode button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');searchMode=b.dataset.m;
+  $('#q').placeholder=searchMode==='zip'?'Enter a ZIP code, e.g. 85331':'Search a city, e.g. Cave Creek';hideAC();
+});
+let acTimer=null;
+$('#q').addEventListener('input',e=>{
+  if(searchMode==='zip'){hideAC();return;}
+  clearTimeout(acTimer);const v=e.target.value.trim();
+  if(v.length<2){hideAC();return;}
+  acTimer=setTimeout(async()=>{acItems=await j('/api/suggest?q='+encodeURIComponent(v));renderAC();},110);
+});
+function renderAC(){const ac=$('#ac');if(!acItems.length){hideAC();return;}
+  ac.innerHTML=acItems.map((it,i)=>`<div data-i="${i}" class="${i===acSel?'sel':''}"><span>${it.city}, ${it.state_id}</span>
+     <span class="tag">${it.niches} niches · ${it.zips} ZIPs</span></div>`).join('');
+  ac.classList.remove('hide');
+  ac.querySelectorAll('div').forEach(d=>d.onclick=()=>pick(acItems[d.dataset.i]));}
+function hideAC(){$('#ac').classList.add('hide');acSel=-1;}
+$('#q').addEventListener('keydown',e=>{
+  if($('#ac').classList.contains('hide')){if(e.key==='Enter')runSearch();return;}
+  if(e.key==='ArrowDown'){acSel=Math.min(acSel+1,acItems.length-1);renderAC();e.preventDefault();}
+  else if(e.key==='ArrowUp'){acSel=Math.max(acSel-1,0);renderAC();e.preventDefault();}
+  else if(e.key==='Enter'){if(acSel>=0)pick(acItems[acSel]);else runSearch();e.preventDefault();}
+  else if(e.key==='Escape'){hideAC();}});
+document.addEventListener('click',e=>{if(!e.target.closest('.field'))hideAC();});
+function pick(it){$('#q').value=it.city+', '+it.state_id;hideAC();loadCity(it.city,it.state_id);}
+$('#go').onclick=runSearch;
+function runSearch(){hideAC();const v=$('#q').value.trim();if(!v)return;
+  if(searchMode==='zip'){loadZip(v.replace(/[^0-9]/g,''));return;}
+  let city=v,state='';const m=v.match(/^(.*),\s*([A-Za-z]{2})$/);if(m){city=m[1].trim();state=m[2].toUpperCase();}
+  if(state)loadCity(city,state);
+  else j('/api/suggest?q='+encodeURIComponent(city)).then(r=>r.length?loadCity(r[0].city,r[0].state_id):renderEmpty(city,''));}
+async function loadCity(city,state){
+  const d=await j(`/api/coverage?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`);
+  if(!d.niches||!d.niches.length)return renderEmpty(city,state);
+  CURRENT=d;pushRecent(city,state);renderCity();}
+async function loadZip(zip){const d=await j('/api/coverage_zip?zip='+encodeURIComponent(zip));
+  if(d.error)return renderEmptyZip(zip,d.error);
+  $('#q').value=d.city+', '+d.state;CURRENT=d;pushRecent(d.city,d.state);renderCity();}
+
+function pushRecent(city,state){let r=LS.get('recent',[]);const k=city+'|'+state;
+  r=r.filter(x=>x!==k);r.unshift(k);r=r.slice(0,6);LS.set('recent',r);renderRecent();}
+function renderRecent(){const r=LS.get('recent',[]);const el=$('#recent');
+  if(!r.length){el.classList.add('hide');return;}
+  el.classList.remove('hide');
+  el.innerHTML='<span class="rl">Recent</span>'+r.map(k=>{const[c,s]=k.split('|');
+    return `<span class="chip" data-c="${c}" data-s="${s}">${c}, ${s}</span>`}).join('');
+  el.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{$('#q').value=c.dataset.c+', '+c.dataset.s;loadCity(c.dataset.c,c.dataset.s);});}
+
+const SORTS={payout:(a,b)=>b.payout-a.payout,population:(a,b)=>(a.population||1e15)-(b.population||1e15),
+  zips:(a,b)=>b.zips-a.zips,score:(a,b)=>b.score-a.score,niche:(a,b)=>a.niche.localeCompare(b.niche)};
+function applySort(list,sort){let s=[...list].sort(SORTS[sort.key]||SORTS.score);if(sort.dir===1)s.reverse();return s;}
+function scTier(s,max){const r=s/(max||1);return r>.66?'t3':r>.33?'t2':'t1';}
+function scoreCell(s,max){return `<span class="sc ${scTier(s,max)}"><span class="dot"></span>${fmt(s)}</span>`;}
+
+function isSaved(city,state){return LS.get('saved',[]).includes(city+'|'+state);}
+function toggleSaved(city,state){let s=LS.get('saved',[]);const k=city+'|'+state;
+  if(s.includes(k)){s=s.filter(x=>x!==k);toast('Removed from saved');}else{s.push(k);toast('Saved');}
+  LS.set('saved',s);return s.includes(k);}
+
+function renderCity(){
+  const d=CURRENT,niches=applySort(d.niches,SORT);
+  const presets=[['score','Best fit'],['payout','Payout'],['population','Smallest market'],['zips','Most ZIPs']];
+  const saved=isSaved(d.city,d.state);
+  let h=`<div class="hero">
+     <div class="big"><span class="star ${saved?'on':''}" id="starBtn" title="Save this market">${saved?'★':'☆'}</span>${d.city}, ${d.state}</div>
+     <span class="cov">${d.niche_count} of ${META.niches.length} niches available</span>
+     <span class="pill">Population <b>${fmt(d.total_population)}</b></span>
+     <span class="pill">ZIPs covered <b>${fmt(d.total_zips)}</b></span>
+     ${d.county?`<span class="pill">${d.county} County</span>`:''}
+   </div>
+   <div class="controls"><span class="lbl">Sort by</span><div class="seg" id="cpreset">
+     ${presets.map(p=>`<button data-k="${p[0]}" class="${SORT.key===p[0]?'on':''}">${p[1]}</button>`).join('')}
+   </div></div>`;
+  if(d.bundles){const b=d.bundles;
+    h+=`<div class="bundle"><h3>Bundle opportunity — ZIP ${b.zip}</h3>
+      <div class="combo">${b.stack.map(s=>`${s.niche} <b>${usd(s.payout)}</b>`).join('  +  ')}
+       &nbsp;→ stacked <b>${usd(b.combined)}</b> per shared lead · ${b.count} niches cover this ZIP</div></div>`;}
+  h+=`<div class="tablecard"><table><thead><tr>
+      <th data-k="niche">NICHE</th><th class="num" data-k="payout">PAYOUT</th>
+      <th class="num" data-k="zips">ZIPS</th><th class="num opt" data-k="population">POPULATION</th>
+      </tr></thead><tbody>`;
+  niches.forEach((n,i)=>{
+    const multi = n.min_payout!=null && n.min_payout < n.payout;
+    const payCell = multi
+      ? `<span class="pay">${usd(n.payout)}</span><span class="range">${usd(n.min_payout)}–${usd(n.payout)}</span>`
+      : `<span class="pay">${usd(n.payout)}</span>`;
+    h+=`<tr class="city-row" data-i="${i}" title="Click to see all ${n.zips} ZIP${n.zips>1?'s':''} and their payouts">
+      <td class="niche-name"><span class="row-car">▸</span>${n.niche}<span class="ptype">${n.payout_type}</span></td>
+      <td class="num">${payCell}</td>
+      <td class="num">${fmt(n.zips)} ZIP${n.zips>1?'s':''}</td>
+      <td class="num opt">${fmt(n.population)}</td></tr>
+      <tr class="zdetail hide" id="zd-${i}"><td colspan="4"><div class="zwrap">loading…</div></td></tr>`;});
+  h+=`</tbody></table></div>
+   <div class="row-actions"><button class="btn ghost" id="csv">Export CSV</button>
+     <button class="btn ghost" id="csvz">Export with ZIPs</button>
+     <button class="btn ghost" id="kw">Copy keywords</button>
+     <button class="btn ghost" id="addcmp">Add to compare</button><span id="cmpnote" class="lbl"></span></div>`;
+  $('#cityResult').innerHTML=h;
+  $('#starBtn').onclick=()=>{toggleSaved(d.city,d.state);renderCity();};
+  document.querySelectorAll('#cpreset button').forEach(b=>b.onclick=()=>{SORT={key:b.dataset.k,dir:-1};renderCity();});
+  document.querySelectorAll('#cityResult th[data-k]').forEach(t=>t.onclick=()=>{
+    if(SORT.key===t.dataset.k)SORT.dir*=-1;else SORT={key:t.dataset.k,dir:-1};renderCity();});
+  document.querySelectorAll('#cityResult .city-row').forEach(tr=>tr.onclick=e=>{
+    if(e.target.closest('a,button,input,select,.zcopy'))return;
+    toggleCityZips(d,niches[tr.dataset.i],tr.dataset.i,tr);
+  });
+  $('#csv').onclick=()=>exportCity(d,niches);
+  $('#csvz').onclick=()=>exportCityZips(d,niches);
+  $('#kw').onclick=()=>copyKeywordsCity(d,niches);
+  $('#addcmp').onclick=()=>addCompare(d);
+  renderCompareNote();
+}
+const ZCACHE={};
+async function fetchCityZips(d,n){
+  const key=`${d.city}|${d.state}|${n.niche}|${n.payout_type}`;
+  if(ZCACHE[key])return ZCACHE[key];
+  const r=await j(`/api/zips?city=${encodeURIComponent(d.city)}&state=${encodeURIComponent(d.state)}&niche=${encodeURIComponent(n.niche)}&ptype=${encodeURIComponent(n.payout_type)}`);
+  ZCACHE[key]=r;return r;}
+async function toggleCityZips(d,n,i,tr){
+  const row=$('#zd-'+i);
+  if(!row.classList.contains('hide')){row.classList.add('hide');if(tr)tr.classList.remove('open');return;}
+  row.classList.remove('hide');if(tr)tr.classList.add('open');
+  const r=await fetchCityZips(d,n);
+  const maxP=r.max||1;
+  const chips=r.zips.map(z=>{const pct=Math.round(100*z.payout/maxP);
+    return `<div class="zchip"><span class="zc-zip">${z.zip}</span><span class="zc-bar" style="width:${Math.max(6,pct*0.5)}px"></span><span class="zc-pay">${usd(z.payout)}</span></div>`;}).join('');
+  row.querySelector('.zwrap').innerHTML=
+    `<div class="zhead">${r.count} ZIP${r.count>1?'s':''} for ${n.niche} (${n.payout_type}) · ${r.min<r.max?`${usd(r.min)}–${usd(r.max)}`:usd(r.max)}
+       <span class="zcopy" data-i="${i}">copy ZIPs</span></div><div class="zgrid">${chips}</div>`;
+  const cp=row.querySelector('.zcopy');
+  if(cp)cp.onclick=()=>{navigator.clipboard.writeText(r.zips.map(z=>z.zip).join('\n')).then(()=>toast(`Copied ${r.count} ZIPs`));};
+}
+async function exportCityZips(d,niches){
+  const all=await Promise.all(niches.map(n=>fetchCityZips(d,n)));
+  const head=['city','state','county','niche','payout_type','zip','payout'];
+  const lines=[head.join(',')];
+  all.forEach((r,idx)=>{const n=niches[idx];
+    r.zips.forEach(z=>lines.push([d.city,d.state,d.county||'',n.niche,n.payout_type,z.zip,z.payout]
+      .map(v=>`"${(''+(v==null?'':v)).replace(/"/g,'""')}"`).join(',')));});
+  dl(lines.join('\n'),`leadsmart_${d.city.replace(/\s+/g,'_')}_${d.state}_ZIPS.csv`);
+  toast('Exported per-ZIP CSV');}
+function renderEmpty(city,state){CURRENT=null;
+  $('#cityResult').innerHTML=`<div class="empty"><h3>“${city}${state?', '+state:''}” isn’t in LeadSmart’s network.</h3>
+    <div class="lbl">Looking for covered cities nearby…</div><div class="near" id="near"></div></div>`;
+  if(state)loadNearby(city,state);}
+function renderEmptyZip(zip,msg){CURRENT=null;
+  $('#cityResult').innerHTML=`<div class="empty"><h3>ZIP ${zip}: ${msg}</h3>
+    <div class="lbl">Try the city search to find the nearest covered market.</div></div>`;}
+async function loadNearby(city,state){
+  const r=await j(`/api/nearby?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&radius=40`);
+  const el=$('#near');if(!el)return;
+  if(!r.length){el.innerHTML='<span class="lbl">No covered cities within 40 miles.</span>';return;}
+  el.innerHTML=r.map(x=>`<a data-c="${x.city}" data-s="${x.state}">${x.city}, ${x.state}
+     <span class="tag">· ${x.distance} mi · ${x.niches} niches</span></a>`).join('');
+  el.querySelectorAll('a').forEach(a=>a.onclick=()=>{$('#q').value=a.dataset.c+', '+a.dataset.s;loadCity(a.dataset.c,a.dataset.s);});}
+function kwSlug(n){return n.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();}
+function copyKeywordsCity(d,niches){
+  const lines=niches.map(n=>`${kwSlug(n.niche)} ${d.city.toLowerCase()} ${d.state.toLowerCase()}`);
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>toast(`Copied ${lines.length} keywords`));}
+function exportCity(d,niches){
+  const head=['city','state','county','niche','payout_type','payout','avg_payout','min_payout','zips','population','score'];
+  const lines=[head.join(',')];
+  niches.forEach(n=>lines.push([d.city,d.state,d.county||'',n.niche,n.payout_type,n.payout,n.avg_payout,n.min_payout,n.zips,n.population,n.score]
+    .map(v=>`"${(''+(v==null?'':v)).replace(/"/g,'""')}"`).join(',')));
+  dl(lines.join('\n'),`leadsmart_${d.city.replace(/\s+/g,'_')}_${d.state}.csv`);}
+let CMP=[];
+function addCompare(d){const k=d.city+'|'+d.state;if(!CMP.includes(k))CMP.push(k);if(CMP.length>4)CMP.shift();renderCompareNote();}
+function renderCompareNote(){const el=$('#cmpnote');if(!el)return;
+  if(!CMP.length){el.textContent='';return;}
+  el.innerHTML=`Comparing ${CMP.map(c=>c.replace('|',', ')).join(' · ')} `+(CMP.length>=2?`<a class="citylink" id="docmp">view matrix →</a>`:'(add one more)');
+  const b=$('#docmp');if(b)b.onclick=showCompare;}
+async function showCompare(){
+  const r=await j('/api/compare?targets='+encodeURIComponent(CMP.join(';')));
+  let h=`<div class="hero"><div class="big">Comparison</div><span class="pill">${r.cities.length} cities</span></div>
+    <div class="tablecard"><table><thead><tr><th>NICHE</th>${r.cities.map(c=>`<th class="num">${c.toUpperCase()}</th>`).join('')}</tr></thead><tbody>`;
+  r.niches.forEach(n=>{h+=`<tr><td class="niche-name">${n}</td>`;
+    r.cities.forEach(c=>{const cell=r.data[c][n];h+=`<td class="num">${cell?usd(cell.payout):'<span class="dim">—</span>'}</td>`;});h+=`</tr>`;});
+  h+=`<tr><td class="dim">Population</td>${r.cities.map(c=>`<td class="num dim">${fmt(r.data[c]._meta.population)}</td>`).join('')}</tr>`;
+  h+=`</tbody></table></div><div class="row-actions"><button class="btn ghost" id="backcmp">← Back</button>
+     <button class="btn ghost" id="clrcmp">Clear</button></div>`;
+  $('#cityResult').innerHTML=h;
+  $('#backcmp').onclick=()=>{if(CURRENT)renderCity();};
+  $('#clrcmp').onclick=()=>{CMP=[];if(CURRENT)renderCity();};}
+
+/* ===================== BY NICHE ===================== */
+const NICHE={loaded:false,niche:null,ptype:null,sort:'score',dir:-1,offset:0,limit:50,last:null};
+function initNiche(){
+  NICHE.loaded=true;
+  // Niche dropdown (replaces 17-chip wall)
+  $('#nichePick').innerHTML=META.niches.map(n=>`<option value="${n}">${n}</option>`).join('');
+  $('#nichePick').addEventListener('change',e=>selectNiche(e.target.value));
+  // Filter & advanced controls
+  ['fState','fCity','fMinPay','fMaxPay','fMinPop','fMaxPop','fMinZip','fDensity'].forEach(id=>{
+    $('#'+id).addEventListener(id==='fCity'?'input':'change',()=>{NICHE.offset=0;loadNiche();});});
+  $('#fReset').onclick=()=>{['fState','fCity','fMinPay','fMaxPay','fMinPop','fMaxPop','fMinZip','fDensity'].forEach(id=>$('#'+id).value='');document.querySelectorAll('#presets .qv').forEach(p=>p.classList.remove('on'));NICHE.offset=0;loadNiche();};
+  ['cCPC','cCPL'].forEach(id=>$('#'+id).addEventListener('input',()=>renderNiche(NICHE.last)));
+  document.querySelectorAll('#presets .qv').forEach(p=>p.onclick=()=>applyPreset(p.dataset.preset,p,/*fromUser=*/true));
+  document.querySelectorAll('#npreset button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#npreset button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');NICHE.sort=b.dataset.k;NICHE.dir=-1;NICHE.offset=0;loadNiche();});
+  // boot
+  $('#nichePick').value='Water Damage';
+  selectNiche('Water Damage', /*applyDefault=*/true);
+}
+function applyPreset(p, cardEl, fromUser){
+  ['fState','fCity','fMinPay','fMaxPay','fMinPop','fMaxPop','fMinZip','fDensity'].forEach(id=>$('#'+id).value='');
+  document.querySelectorAll('#presets .qv').forEach(c=>c.classList.remove('on'));
+  if(cardEl)cardEl.classList.add('on');
+  const t=NICHE.last;const topPay=t&&t.cities.length?Math.max(...t.cities.map(c=>c.payout)):0;
+  if(p==='gems'){if(topPay)$('#fMinPay').value=Math.round(topPay*0.9);$('#fMaxPop').value=50000;$('#fMinPop').value=5000;NICHE.sort='score';}
+  else if(p==='supply'){if(topPay)$('#fMinPay').value=Math.round(topPay*0.9);$('#fMinZip').value=3;NICHE.sort='zips';}
+  else if(p==='metro'){$('#fMinPop').value=250000;NICHE.sort='payout';}
+  else if(p==='multizip'){$('#fMinZip').value=3;NICHE.sort='score';}
+  else if(p==='all'){NICHE.sort='score';}
+  // (Filters are always visible in the sidebar — no drawer to open.)
+  document.querySelectorAll('#npreset button').forEach(x=>x.classList.toggle('on',x.dataset.k===NICHE.sort));
+  NICHE.dir=-1;NICHE.offset=0;loadNiche();
+}
+function selectNiche(n, applyDefault){
+  NICHE.niche=n;NICHE.offset=0;
+  $('#nichePick').value=n;
+  const types=META.niche_types[n]||[];
+  NICHE.ptype=types[0]?types[0].payout_type:'CPL';
+  // payout type toggle
+  $('#ptypeToggle').innerHTML=types.map(t=>`<button data-t="${t.payout_type}" class="${t.payout_type===NICHE.ptype?'on':''}">${t.payout_type}</button>`).join('');
+  document.querySelectorAll('#ptypeToggle button').forEach(b=>b.onclick=()=>{
+    NICHE.ptype=b.dataset.t;NICHE.offset=0;
+    document.querySelectorAll('#ptypeToggle button').forEach(x=>x.classList.toggle('on',x.dataset.t===NICHE.ptype));
+    populateStates();updateNicheStat();loadNiche();});
+  populateStates();updateNicheStat();
+  if(applyDefault){
+    // start fresh with the Hidden gems preset highlighted — gives newbies an instant useful view
+    const card=document.querySelector('#presets .qv[data-preset="gems"]');
+    applyPreset('gems', card);
+  } else {
+    loadNiche();
+  }
+}
+function updateNicheStat(){
+  const t=(META.niche_types[NICHE.niche]||[]).find(x=>x.payout_type===NICHE.ptype);
+  if(!t){$('#nicheStat').innerHTML='';return;}
+  $('#nicheStat').innerHTML=`<b>${fmt(t.cities)}</b> cities<br><b>${fmt(t.zips)}</b> ZIPs covered<br>Top payout <b>${usd0(t.top_payout)}</b>`;
+}
+async function populateStates(){
+  const r=await j(`/api/niche?niche=${encodeURIComponent(NICHE.niche)}&ptype=${encodeURIComponent(NICHE.ptype)}&limit=1`);
+  const cur=$('#fState').value;
+  $('#fState').innerHTML='<option value="">All states</option>'+r.states.map(s=>`<option ${s===cur?'selected':''}>${s}</option>`).join('');}
+function nicheParams(extra={}){
+  const p=new URLSearchParams({niche:NICHE.niche,ptype:NICHE.ptype,sort:NICHE.sort,dir:NICHE.dir,offset:NICHE.offset,limit:NICHE.limit,...extra});
+  const map={fState:'state',fCity:'q',fMinPay:'min_payout',fMaxPay:'max_payout',fMinPop:'min_pop',fMaxPop:'max_pop',fMinZip:'min_zips',fDensity:'density'};
+  for(const[id,key]of Object.entries(map)){const v=$('#'+id).value.trim();if(v)p.set(key,v);}
+  return p;}
+async function loadNiche(){const r=await j('/api/niche?'+nicheParams().toString());NICHE.last=r;renderNiche(r);}
+function profitOf(payout){const cpc=parseFloat($('#cCPC').value);const cpl=parseFloat($('#cCPL').value)||15;
+  if(!cpc||cpc<=0)return null;return payout-cpc*cpl;}
+function renderNiche(r){
+  if(!r)return;
+  const from=r.total?r.offset+1:0,to=Math.min(r.offset+r.limit,r.total);
+  const ntTotal=(META.niche_types[r.niche]||[]).find(t=>t.payout_type===r.payout_type);
+  const showProfit=!!profitOf(100);
+  let h=`<div class="hero">
+     <div class="big">${r.niche}<span class="ptype">${r.payout_type}</span></div>
+     <span class="pill"><b>${fmt(r.total)}</b> cities</span>
+     <span class="pill"><b>${fmt(r.total_zips)}</b> ZIPs in view</span>
+     ${ntTotal?`<span class="pill">niche total <b>${fmt(ntTotal.zips)}</b> ZIPs · top ${usd0(ntTotal.top_payout)}</span>`:''}
+     <span class="pill">showing ${from}–${to}</span></div>`;
+  const cols = 7 + (showProfit?1:0);
+  h+=`<div class="hint-line">Click any row to see its ZIPs and individual payouts.</div>`;
+  h+=`<div class="tablecard"><table><thead><tr>
+     <th class="rank"></th><th class="rank">#</th><th data-k="city">CITY</th><th>STATE</th>
+     <th class="num" data-k="payout">PAYOUT</th>
+     ${showProfit?'<th class="num">PROFIT/LEAD</th>':''}
+     <th class="num" data-k="zips">ZIPS</th>
+     <th class="num opt" data-k="population">POPULATION</th>
+     <th class="opt">COUNTY</th></tr></thead><tbody>`;
+  r.cities.forEach((c,i)=>{
+    const pr=profitOf(c.payout);
+    const multi = c.min_payout!=null && c.min_payout < c.payout;
+    const payCell = multi
+      ? `<span class="pay">${usd(c.payout)}</span><span class="range">${usd(c.min_payout)}–${usd(c.payout)}</span>`
+      : `<span class="pay">${usd(c.payout)}</span>`;
+    h+=`<tr class="city-row" data-i="${i}" title="Click to see all ${c.zips} ZIP${c.zips>1?'s':''} and their payouts">
+      <td class="rank"><span class="row-car">▸</span></td>
+      <td class="rank">${r.offset+i+1}</td>
+      <td><span class="citylink" data-c="${c.city}" data-s="${c.state_id}" title="Open ${c.city} in By City">${c.city}</span></td>
+      <td>${c.state_id}</td>
+      <td class="num">${payCell}</td>
+      ${showProfit?`<td class="num"><span class="profit ${pr>=0?'pos':'neg'}">${usd(pr)}</span></td>`:''}
+      <td class="num">${fmt(c.zips)}</td>
+      <td class="num opt">${fmt(c.population)}</td>
+      <td class="opt county">${c.county||'—'}</td></tr>
+      <tr class="zdetail hide" id="nz-${i}"><td colspan="${cols}"><div class="zwrap">loading…</div></td></tr>`;});
+  if(!r.cities.length)h+=`<tr><td colspan="${cols}" style="color:var(--ink3);padding:32px;text-align:center">No cities match these filters.</td></tr>`;
+  h+=`</tbody></table></div>`;
+  const pages=Math.ceil(r.total/r.limit),cur=Math.floor(r.offset/r.limit)+1;
+  h+=`<div class="pager">
+     <button class="btn ghost sm" id="prev" ${r.offset<=0?'disabled':''}>← Prev</button>
+     <span class="count">Page ${cur} of ${Math.max(1,pages)}</span>
+     <button class="btn ghost sm" id="next" ${to>=r.total?'disabled':''}>Next →</button>
+     <span style="flex:1"></span>
+     <button class="btn ghost sm" id="nkw">Copy keywords</button>
+     <button class="btn ghost sm" id="ncsv">Export filtered CSV</button>
+   </div>`;
+  $('#nicheResult').innerHTML=h;
+  document.querySelectorAll('#nicheResult .citylink').forEach(a=>a.onclick=(e)=>{
+    e.stopPropagation();
+    document.querySelector('.maintabs button[data-tab="city"]').click();
+    $('#q').value=a.dataset.c+', '+a.dataset.s;loadCity(a.dataset.c,a.dataset.s);});
+  document.querySelectorAll('#nicheResult .city-row').forEach(tr=>tr.onclick=e=>{
+    if(e.target.closest('a,button,input,select,.citylink,.zcopy'))return;
+    toggleNicheZips(r,r.cities[tr.dataset.i],tr.dataset.i,tr);
+  });
+  document.querySelectorAll('#nicheResult th[data-k]').forEach(t=>t.onclick=()=>{
+    if(NICHE.sort===t.dataset.k)NICHE.dir*=-1;else{NICHE.sort=t.dataset.k;NICHE.dir=-1;}
+    document.querySelectorAll('#npreset button').forEach(x=>x.classList.toggle('on',x.dataset.k===NICHE.sort));
+    NICHE.offset=0;loadNiche();});
+  const pv=$('#prev'),nx=$('#next');
+  if(pv)pv.onclick=()=>{NICHE.offset=Math.max(0,NICHE.offset-NICHE.limit);loadNiche();window.scrollTo({top:0,behavior:'smooth'});};
+  if(nx)nx.onclick=()=>{NICHE.offset+=NICHE.limit;loadNiche();window.scrollTo({top:0,behavior:'smooth'});};
+  $('#ncsv').onclick=()=>exportNiche();
+  $('#nkw').onclick=()=>copyKeywordsNiche();
+}
+async function toggleNicheZips(r,c,i,tr){
+  const row=$('#nz-'+i);
+  if(!row.classList.contains('hide')){row.classList.add('hide');if(tr)tr.classList.remove('open');return;}
+  row.classList.remove('hide');if(tr)tr.classList.add('open');
+  const data=await j(`/api/zips?city=${encodeURIComponent(c.city)}&state=${encodeURIComponent(c.state_id)}&niche=${encodeURIComponent(r.niche)}&ptype=${encodeURIComponent(r.payout_type)}`);
+  const maxP=data.max||1;
+  const chips=data.zips.map(z=>{const pct=Math.round(100*z.payout/maxP);
+    return `<div class="zchip"><span class="zc-zip">${z.zip}</span><span class="zc-bar" style="width:${Math.max(6,pct*0.5)}px"></span><span class="zc-pay">${usd(z.payout)}</span></div>`;}).join('');
+  row.querySelector('.zwrap').innerHTML=
+    `<div class="zhead">${data.count} ZIP${data.count>1?'s':''} for ${c.city}, ${c.state_id} — ${r.niche} (${r.payout_type}) · ${data.min<data.max?`${usd(data.min)}–${usd(data.max)}`:usd(data.max)}
+       <span class="zcopy">copy ZIPs</span></div><div class="zgrid">${chips}</div>`;
+  const cp=row.querySelector('.zcopy');
+  if(cp)cp.onclick=(e)=>{e.stopPropagation();navigator.clipboard.writeText(data.zips.map(z=>z.zip).join('\n')).then(()=>toast(`Copied ${data.count} ZIPs`));};
+}
+
+async function exportNiche(){
+  const r=await j('/api/niche?'+nicheParams({offset:0,limit:1000}).toString());
+  const head=['rank','city','state','niche','payout_type','payout','avg_payout','zips','population','density','county','score'];
+  const lines=[head.join(',')];
+  r.cities.forEach((c,i)=>lines.push([i+1,c.city,c.state_id,r.niche,r.payout_type,c.payout,c.avg_payout,c.zips,c.population,c.density,c.county||'',c.score]
+    .map(v=>`"${(''+(v==null?'':v)).replace(/"/g,'""')}"`).join(',')));
+  dl(lines.join('\n'),`leadsmart_${r.niche.replace(/\s+/g,'_')}_${r.payout_type}.csv`);}
+async function copyKeywordsNiche(){
+  const r=await j('/api/niche?'+nicheParams({offset:0,limit:200}).toString());
+  const slug=kwSlug(r.niche);
+  const lines=r.cities.map(c=>`${slug} ${c.city.toLowerCase()} ${c.state_id.toLowerCase()}`);
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>toast(`Copied ${lines.length} keywords`));}
+
+/* ===================== BY STATE ===================== */
+const STATE={loaded:false,cur:null};
+async function initState(){
+  STATE.loaded=true;
+  const states=await j('/api/states');
+  $('#stategrid').innerHTML=states.map(s=>`<button data-s="${s.state_id}" title="${s.niches} niches · ${fmt(s.zips)} ZIPs">${s.state_id}</button>`).join('');
+  document.querySelectorAll('#stategrid button').forEach(b=>b.onclick=()=>selectState(b.dataset.s));
+  selectState('AZ');
+}
+async function selectState(st){
+  STATE.cur=st;
+  document.querySelectorAll('#stategrid button').forEach(b=>b.classList.toggle('on',b.dataset.s===st));
+  const d=await j('/api/state?state='+st);
+  const totalZips=d.niches.reduce((a,n)=>a+n.zips,0);
+  let h=`<div class="hero"><div class="big">${st}</div>
+     <span class="pill"><b>${d.count}</b> niche/type markets</span>
+     <span class="pill"><b>${fmt(totalZips)}</b> total ZIPs covered</span></div>`;
+  h+=`<div class="tablecard"><table><thead><tr>
+     <th>NICHE</th><th>TYPE</th><th class="num">TOP PAYOUT</th><th class="num opt">AVG</th>
+     <th class="num">CITIES</th><th class="num">ZIPS COVERED</th><th class="num opt">POPULATION</th><th></th>
+     </tr></thead><tbody>`;
+  d.niches.forEach(n=>{
+    h+=`<tr><td class="niche-name">${n.niche}</td><td><span class="ptype" style="margin:0">${n.payout_type}</span></td>
+      <td class="num"><span class="pay">${usd(n.top_payout)}</span></td>
+      <td class="num opt dim">${usd(n.avg_payout)}</td>
+      <td class="num">${fmt(n.cities)}</td>
+      <td class="num"><b>${fmt(n.zips)}</b></td>
+      <td class="num opt dim">${fmt(n.population)}</td>
+      <td class="num"><span class="citylink" data-n="${n.niche}" data-t="${n.payout_type}">browse →</span></td></tr>`;});
+  h+=`</tbody></table></div>`;
+  $('#stateResult').innerHTML=h;
+  document.querySelectorAll('#stateResult .citylink').forEach(a=>a.onclick=()=>{
+    document.querySelector('.maintabs button[data-tab="niche"]').click();
+    if(!NICHE.loaded)initNiche();
+    $('#fState').value=st;NICHE.niche=a.dataset.n;NICHE.ptype=a.dataset.t;
+    document.querySelectorAll('#nichebar button').forEach(b=>b.classList.toggle('on',b.dataset.n===a.dataset.n));
+    selectNiche(a.dataset.n);setTimeout(()=>{$('#fState').value=st;NICHE.offset=0;loadNiche();},50);});
+}
+
+/* ===================== BUNDLES ===================== */
+const BUN={loaded:false};
+async function initBundles(){
+  BUN.loaded=true;
+  const states=await j('/api/states');
+  $('#bState').innerHTML='<option value="">All states</option>'+states.map(s=>`<option>${s.state_id}</option>`).join('');
+  ['bState','bMinNiche','bMinPop','bSort'].forEach(id=>$('#'+id).addEventListener('change',loadBundles));
+  $('#bMinPop').addEventListener('input',()=>{clearTimeout(BUN.t);BUN.t=setTimeout(loadBundles,300);});
+  loadBundles();
+}
+async function loadBundles(){
+  const p=new URLSearchParams({min_niches:$('#bMinNiche').value,sort:$('#bSort').value,limit:60});
+  if($('#bState').value)p.set('state',$('#bState').value);
+  if($('#bMinPop').value)p.set('min_pop',$('#bMinPop').value);
+  const r=await j('/api/bundles?'+p.toString());
+  let h=`<div class="hero"><div class="big">Stackable markets</div>
+     <span class="pill"><b>${fmt(r.total)}</b> cities</span></div>`;
+  h+=`<div class="tablecard"><table><thead><tr>
+     <th class="rank">#</th><th>CITY</th><th>STATE</th><th class="num">SHARED ZIP</th>
+     <th class="num">NICHES</th><th class="num">COMBINED PAYOUT</th><th class="opt">TOP STACK</th>
+     <th class="num opt">POPULATION</th></tr></thead><tbody>`;
+  r.items.forEach((c,i)=>{
+    const stack=c.stack.map(s=>`${s.niche} ${usd0(s.payout)}`).join(' · ');
+    h+=`<tr><td class="rank">${i+1}</td>
+      <td><span class="citylink" data-c="${c.city}" data-s="${c.state_id}">${c.city}</span></td>
+      <td>${c.state_id}</td><td class="num dim">${c.zip}</td>
+      <td class="num"><b>${c.niche_count}</b></td>
+      <td class="num"><span class="pay" style="color:var(--acc)">${usd(c.combined)}</span></td>
+      <td class="opt dim" style="font-size:12.5px">${stack}</td>
+      <td class="num opt">${fmt(c.population)}</td></tr>`;});
+  if(!r.items.length)h+=`<tr><td colspan="8" style="color:var(--ink3);padding:32px;text-align:center">No stackable cities match.</td></tr>`;
+  h+=`</tbody></table></div>`;
+  $('#bundleResult').innerHTML=h;
+  document.querySelectorAll('#bundleResult .citylink').forEach(a=>a.onclick=()=>{
+    document.querySelector('.maintabs button[data-tab="city"]').click();
+    $('#q').value=a.dataset.c+', '+a.dataset.s;loadCity(a.dataset.c,a.dataset.s);});
+}
+
+/* ===================== SAVED ===================== */
+async function renderSaved(){
+  const saved=LS.get('saved',[]);
+  if(!saved.length){$('#savedResult').innerHTML=`<div class="empty"><h3>No saved markets yet.</h3>
+    <div class="lbl">Search a city and tap the ☆ star to save it here for quick access.</div></div>`;return;}
+  $('#savedResult').innerHTML=`<div class="dim" style="margin:10px 0">Loading ${saved.length} markets…</div>`;
+  const rows=await Promise.all(saved.map(k=>{const[c,s]=k.split('|');
+    return j(`/api/coverage?city=${encodeURIComponent(c)}&state=${encodeURIComponent(s)}`);}));
+  let h=`<div class="tablecard"><table><thead><tr>
+     <th>CITY</th><th class="num">NICHES</th><th class="num">ZIPS</th><th class="num opt">POPULATION</th>
+     <th>TOP NICHE</th><th class="num">TOP PAYOUT</th><th></th></tr></thead><tbody>`;
+  rows.forEach(d=>{const top=d.niches&&d.niches[0];
+    h+=`<tr>
+      <td><span class="citylink" data-c="${d.city}" data-s="${d.state}">${d.city}, ${d.state}</span></td>
+      <td class="num">${d.niche_count}</td><td class="num">${fmt(d.total_zips)}</td>
+      <td class="num opt">${fmt(d.total_population)}</td>
+      <td class="niche-name">${top?top.niche:'—'}<span class="ptype">${top?top.payout_type:''}</span></td>
+      <td class="num"><span class="pay">${top?usd(top.payout):'—'}</span></td>
+      <td class="num"><span class="citylink rm" data-c="${d.city}" data-s="${d.state}">remove</span></td></tr>`;});
+  h+=`</tbody></table></div>`;
+  $('#savedResult').innerHTML=h;
+  document.querySelectorAll('#savedResult .citylink:not(.rm)').forEach(a=>a.onclick=()=>{
+    document.querySelector('.maintabs button[data-tab="city"]').click();
+    $('#q').value=a.dataset.c+', '+a.dataset.s;loadCity(a.dataset.c,a.dataset.s);});
+  document.querySelectorAll('#savedResult .rm').forEach(a=>a.onclick=()=>{toggleSaved(a.dataset.c,a.dataset.s);renderSaved();});
+}
+
+function dl(text,name){const b=new Blob([text],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();}
+
+(async()=>{
+  META=await j('/api/meta');
+  $('#hstat').innerHTML=`
+    <div class="s"><div class="n">${fmt(META.total_cities)}</div><div class="l">Cities</div></div>
+    <div class="s"><div class="n">${META.niches.length}</div><div class="l">Niches</div></div>
+    <div class="s"><div class="n">${META.data_date.slice(5)}</div><div class="l">Updated ’25</div></div>`;
+  const src=META.source||'LeadSmart payouts';
+  $('#foot').innerHTML=`Updated ${META.data_date} · ${fmt(META.total_cities)} cities · ${META.niches.length} niches · synced from ${src} · population & county from US Cities dataset`;
+  renderRecent();
+})();
+</script>
+</body>
+</html>

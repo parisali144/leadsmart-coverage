@@ -1,0 +1,23 @@
+# Generated artifacts — rebuilt by `python sync_supabase.py` and the CI pipeline.
+# Never commit the SQLite DB or the deploy package; they are reproduced fresh each run.
+app/leadsmart.db
+netlify-build/leadsmart.db
+deploy.zip
+deploy-resp.json
+dist/
+
+# Local dev junk
+*.pyc
+__pycache__/
+.venv/
+.idea/
+.vscode/
+
+# Old static snapshot — superseded by the live Supabase sync.
+# Uncomment if you want to keep it tracked.
+workbook.xlsx
+analysis/
+detailed.py
+analyze.py
+easy_targets.py
+targets.py

@@ -1,0 +1,20 @@
+[build]
+  publish = "."
+
+# Aggressive cache for the database — it only changes when we rebuild.
+# Browsers will keep the 38MB DB for repeat visits, so only the first load is slow.
+[[headers]]
+  for = "/leadsmart.db"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    Content-Type = "application/vnd.sqlite3"
+
+[[headers]]
+  for = "/data.js"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

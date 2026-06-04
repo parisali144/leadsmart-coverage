@@ -73,13 +73,25 @@
     '/api/suggest': (q) => {
       const s = (q.q || '').trim();
       if (s.length < 2) return [];
-      return query(`SELECT city,state_id,
-            COUNT(DISTINCT niche) niches, COUNT(DISTINCT zip) zips
+      // Rank so the big-city the user almost certainly means comes first:
+      //   1. Exact name match  (so "Phoenix" beats "Phoenixville")
+      //   2. Population        (so Phoenix AZ beats Phoenix MD)
+      //   3. ZIP coverage      (tiebreaker for unknown-pop entries)
+      //   4. Niche breadth     (final tiebreaker)
+      return query(`SELECT city, state_id,
+            COUNT(DISTINCT niche) AS niches,
+            COUNT(DISTINCT zip)   AS zips,
+            MAX(population)       AS population
           FROM coverage
           WHERE city IS NOT NULL AND state_id IS NOT NULL
             AND city LIKE ? COLLATE NOCASE
-          GROUP BY city,state_id
-          ORDER BY niches DESC, zips DESC LIMIT 12`, [s + '%']);
+          GROUP BY city, state_id
+          ORDER BY
+            CASE WHEN LOWER(city)=LOWER(?) THEN 0 ELSE 1 END,
+            COALESCE(population,0) DESC,
+            zips DESC,
+            niches DESC
+          LIMIT 12`, [s + '%', s]);
     },
 
     '/api/coverage': (q) => coverageFor(q.city, q.state),

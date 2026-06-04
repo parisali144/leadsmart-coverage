@@ -489,7 +489,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="data.js?v=2026-06-04b"></script>
+<script src="data.js?v=2026-06-04c"></script>
 <script>
 const $=s=>document.querySelector(s);
 const fmt=n=>n==null?'—':Number(n).toLocaleString();
@@ -528,9 +528,17 @@ $('#q').addEventListener('input',e=>{
   if(v.length<2){hideAC();return;}
   acTimer=setTimeout(async()=>{acItems=await j('/api/suggest?q='+encodeURIComponent(v));renderAC();},110);
 });
+function compactPop(n){
+  if(n==null) return '';
+  if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M people';
+  if(n>=1e3) return Math.round(n/1e3)+'k people';
+  return n.toLocaleString()+' people';
+}
 function renderAC(){const ac=$('#ac');if(!acItems.length){hideAC();return;}
-  ac.innerHTML=acItems.map((it,i)=>`<div data-i="${i}" class="${i===acSel?'sel':''}"><span>${it.city}, ${it.state_id}</span>
-     <span class="tag">${it.niches} niches · ${it.zips} ZIPs</span></div>`).join('');
+  ac.innerHTML=acItems.map((it,i)=>{
+    const tag = it.population ? `${compactPop(it.population)} · ${it.niches} niches` : `${it.niches} niches · ${it.zips} ZIPs`;
+    return `<div data-i="${i}" class="${i===acSel?'sel':''}"><span>${it.city}, ${it.state_id}</span>
+       <span class="tag">${tag}</span></div>`;}).join('');
   ac.classList.remove('hide');
   ac.querySelectorAll('div').forEach(d=>d.onclick=()=>pick(acItems[d.dataset.i]));}
 function hideAC(){$('#ac').classList.add('hide');acSel=-1;}

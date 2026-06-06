@@ -52,28 +52,68 @@ GROUP_TO_TYPE = {
 }
 
 
-def supa_get(path):
-    req = Request(f'{SUPA_URL}/rest/v1/{path}', headers=HEADERS)
-    with urlopen(req, timeout=60) as r:
-        return json.loads(r.read())
+def supa_get(path, extra_headers=None):
+    """Single GET against Supabase REST. Returns (parsed_json, response_headers).
+    Retries on transient network errors (connection reset, timeout, HTTP 5xx)."""
+    h = dict(HEADERS)
+    if extra_headers:
+        h.update(extra_headers)
+    url = f'{SUPA_URL}/rest/v1/{path}'
+    last_err = None
+    for attempt in range(4):
+        try:
+            req = Request(url, headers=h)
+            with urlopen(req, timeout=60) as r:
+                body = r.read()
+                return json.loads(body), dict(r.headers)
+        except Exception as e:
+            last_err = e
+            wait = 2 ** attempt   # 1, 2, 4, 8 seconds
+            print(f'  ! supa_get({path[:60]}) failed (attempt {attempt+1}/4): {e}; retrying in {wait}s')
+            time.sleep(wait)
+    raise RuntimeError(f'supa_get gave up after 4 attempts on {path}: {last_err}')
 
 
 def fetch_all(table, columns='*'):
-    """Paginate through every row of a Supabase table.
-    Supabase REST default cap is 1000 rows per request — we honour that and
-    only stop when we receive strictly fewer than 1000 rows."""
+    """Robust paginated fetch. Three protections against the silent-truncation
+    bug that the naive 'len(rows) < PAGE' approach has:
+
+      1. Get the exact total count first via Prefer: count=exact + Content-Range.
+      2. Loop using offset accumulated by actual rows received, until we hit
+         that known total — never trust 'short page = last page'.
+      3. If we still come up short after the loop, raise instead of silently
+         deploying a truncated DB."""
     PAGE = 1000
+
+    # Step 1 — get the exact total. Supabase returns "Content-Range: 0-0/321822".
+    _, hdrs = supa_get(f'{table}?select={columns}&limit=1',
+                       extra_headers={'Prefer': 'count=exact'})
+    cr = hdrs.get('Content-Range') or hdrs.get('content-range') or '*/0'
+    try:
+        total = int(cr.split('/')[-1])
+    except ValueError:
+        total = 0
+    print(f'  {table}: total expected = {total:,}')
+
     out, offset = [], 0
-    while True:
-        rows = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}')
+    while offset < total:
+        rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}')
         if not rows:
-            break
+            # Could be a transient empty page — try once more then bail.
+            print(f'  {table}: got empty page at offset {offset}, retrying once…')
+            time.sleep(2)
+            rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}')
+            if not rows:
+                break
         out.extend(rows)
-        print(f'  {table}: fetched {len(out):,} rows', end='\r')
-        if len(rows) < PAGE:
-            break
-        offset += PAGE
-    print(f'  {table}: fetched {len(out):,} rows total')
+        offset += len(rows)
+        print(f'  {table}: fetched {len(out):,}/{total:,} rows', end='\r')
+
+    print(f'  {table}: fetched {len(out):,}/{total:,} rows total')
+    if total and len(out) < total:
+        raise RuntimeError(
+            f'Short fetch on {table}: got {len(out):,} but expected {total:,}. '
+            f'Refusing to write a truncated DB.')
     return out
 
 

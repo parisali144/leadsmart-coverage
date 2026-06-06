@@ -10,7 +10,12 @@
  *   window.j(url)    — replacement for fetch(url).then(r=>r.json())
  */
 (function () {
-  const DB_URL = 'leadsmart.db';
+  // The DB filename never changes, but it's served with `immutable` for 1 year.
+  // We append a version suffix here so a bad/truncated previous DB doesn't keep
+  // serving from the user's browser cache. Bump this whenever the DB schema
+  // or full content materially changes (CI also does this automatically).
+  const DB_VERSION = '20260606-r2';
+  const DB_URL = 'leadsmart.db?v=' + DB_VERSION;
   const SQL_JS_URL = 'https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/';
   let DB = null;
 

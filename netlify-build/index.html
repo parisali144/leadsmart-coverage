@@ -6,18 +6,29 @@
 <title>LeadSmart Coverage Intelligence</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="favicon.svg">
-<meta name="theme-color" content="#1c2433">
+<meta name="theme-color" content="#0c0c0e">
 <style>
   :root{
-    /* RankLocal palette (ranklocal.cc dark theme) */
-    --bg:#1c2433; --bg2:#222a3b; --panel:#2a3040; --panel2:#2f3548; --elevated:#353c50;
-    --line:#3d4354; --line2:#474e62;
-    --ink:#e8eaee; --ink2:#a3a3a3; --ink3:#727a8c;
-    --acc:#e05d38; --acc-d:#c64e2c; --acc-soft:rgba(224,93,56,.13); --acc-line:rgba(224,93,56,.36);
-    --info:#2a3656; --info-line:#3a4a72; --info-ink:#bfdbfe;
-    --good:#46b17f; --bad:#ef4444;
-    --gold:#eaa83a; --violet:#9a86ff;
-    --shadow:0 1px 2px rgba(0,0,0,.32),0 14px 40px rgba(0,0,0,.40);
+    /* RankLocal Editor palette — neutral greyscale + vibrant orange (no blue tint) */
+    --bg:#0c0c0e;        /* page background — near-black */
+    --bg2:#141416;       /* input backgrounds */
+    --panel:#19191c;     /* cards, sidebar, toolbars */
+    --panel2:#1f1f23;    /* hover state for rows */
+    --elevated:#26262b;  /* active toggles */
+    --line:#2a2a2e;      /* subtle borders */
+    --line2:#3a3a3f;     /* stronger borders */
+    --ink:#f0f0f1;       /* primary text */
+    --ink2:#a6a6a9;      /* secondary text */
+    --ink3:#6a6a6f;      /* muted text */
+    --acc:#ff7a2e;       /* RankLocal orange (primary accent) */
+    --acc-d:#e85f10;     /* darker orange for gradients */
+    --acc-soft:rgba(255,122,46,.13); --acc-line:rgba(255,122,46,.38);
+    --info:#1e1e22;      /* neutral info surface (replaces blue) */
+    --info-line:#3a3a3f; --info-ink:#d4d4d6;
+    --good:#42c47e; --bad:#ef4444;
+    --gold:#fbbf24;      /* saved-star (more yellow so it's distinct from orange) */
+    --violet:#9a86ff;
+    --shadow:0 1px 2px rgba(0,0,0,.50),0 14px 40px rgba(0,0,0,.55);
     --radius:14px;
   }
   *{box-sizing:border-box}
@@ -25,8 +36,8 @@
   body{margin:0;color:var(--ink);font-size:15px;line-height:1.55;
        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif;
        background:
-         radial-gradient(1000px 560px at 88% -10%, rgba(224,93,56,.08), transparent 60%),
-         radial-gradient(800px 520px at -5% 0%, rgba(42,54,86,.45), transparent 55%),
+         radial-gradient(1000px 560px at 88% -10%, rgba(255,122,46,.10), transparent 60%),
+         radial-gradient(800px 520px at -5% 0%, rgba(38,38,43,.55), transparent 55%),
          var(--bg);
        min-height:100vh}
   .wrap{max-width:1280px;margin:0 auto;padding:0 28px 100px}
@@ -35,7 +46,7 @@
   header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 0 0;flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:13px}
   .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(140deg,var(--acc),var(--acc-d));
-        display:grid;place-items:center;font-weight:800;color:#fff;font-size:19px;box-shadow:0 6px 18px rgba(224,93,56,.32)}
+        display:grid;place-items:center;font-weight:800;color:#fff;font-size:19px;box-shadow:0 6px 18px rgba(255,122,46,.34)}
   h1{margin:0;font-size:20px;font-weight:680;letter-spacing:-.01em}
   .brand .sub{color:var(--ink2);font-size:13px;margin-top:1px}
   .hstat{display:flex;gap:26px}
@@ -104,11 +115,11 @@
   .rl-cta{display:inline-flex;align-items:center;gap:12px;
           background:linear-gradient(135deg,var(--acc) 0%,var(--acc-d) 100%);
           color:#fff;text-decoration:none;padding:9px 16px 9px 12px;border-radius:12px;
-          box-shadow:0 10px 28px rgba(224,93,56,.32),0 0 0 1px rgba(255,255,255,.06) inset;
+          box-shadow:0 10px 28px rgba(255,122,46,.34),0 0 0 1px rgba(255,255,255,.06) inset;
           transition:filter .15s,transform .08s,box-shadow .2s;position:relative;overflow:hidden}
   .rl-cta::before{content:'';position:absolute;inset:-50% -10% auto auto;width:60%;height:120%;
                   background:radial-gradient(circle,rgba(255,255,255,.18),transparent 65%);pointer-events:none}
-  .rl-cta:hover{filter:brightness(1.06);box-shadow:0 14px 36px rgba(224,93,56,.42),0 0 0 1px rgba(255,255,255,.08) inset}
+  .rl-cta:hover{filter:brightness(1.06);box-shadow:0 14px 36px rgba(255,122,46,.46),0 0 0 1px rgba(255,255,255,.08) inset}
   .rl-cta:active{transform:translateY(1px)}
   .rl-spark{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
             background:rgba(255,255,255,.16);font-size:15px;line-height:1;
@@ -256,7 +267,7 @@
   .sc.t2 .dot{background:#9a6f8f} .sc.t2{color:#b79bb0}
   .sc.t1 .dot{background:#4a5266} .sc.t1{color:var(--ink2)}
 
-  .bundle{margin-top:18px;background:linear-gradient(120deg,var(--acc-soft),rgba(42,54,86,.5));
+  .bundle{margin-top:18px;background:linear-gradient(120deg,var(--acc-soft),rgba(38,38,43,.55));
           border:1px solid var(--line2);border-radius:var(--radius);padding:16px 20px}
   .bundle h3{margin:0 0 5px;font-size:14.5px;font-weight:640}
   .bundle .combo{font-size:13.5px;color:var(--ink2)}
@@ -310,7 +321,7 @@
   #boot .bx{text-align:center;max-width:360px;padding:0 20px}
   #boot .lg{width:56px;height:56px;border-radius:14px;background:linear-gradient(140deg,var(--acc),var(--acc-d));
            display:grid;place-items:center;font-weight:800;color:#fff;font-size:24px;margin:0 auto 20px;
-           box-shadow:0 8px 28px rgba(224,93,56,.35)}
+           box-shadow:0 8px 28px rgba(255,122,46,.36)}
   #boot h2{margin:0 0 6px;font-size:19px;font-weight:640}
   #boot p{color:var(--ink2);font-size:13.5px;margin:0 0 20px}
   #boot .br{width:280px;height:6px;background:var(--panel);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin:0 auto}
@@ -489,7 +500,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="data.js?v=2026-06-06-r2"></script>
+<script src="data.js?v=2026-06-06-theme"></script>
 <script>
 const $=s=>document.querySelector(s);
 const fmt=n=>n==null?'—':Number(n).toLocaleString();

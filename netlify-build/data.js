@@ -164,6 +164,7 @@
     },
 
     '/api/niche': (q) => nicheCities(q),
+    '/api/niche_states': (q) => nicheStates(q.niche || '', q.ptype || 'CPL'),
     '/api/state': (q) => stateSummary(q.state || ''),
     '/api/state_zips': (q) => stateNicheZips(q.state || '', q.niche || '', q.ptype || 'CPL', q.dir),
     '/api/states': () => query(`SELECT state_id,
@@ -305,6 +306,41 @@
       cities: out.slice(offset, offset + limit), offset, limit,
       filters_bypassed: hasCityQ && numericFiltersActive,
     };
+  }
+
+  function nicheStates(niche, ptype) {
+    // Per-state rollup for ONE niche: cities covered, ZIPs, payout range,
+    // avg, population reached. Default sort = most ZIPs first (answers
+    // "which state has the most coverage for this niche").
+    const r = query(`SELECT state_id,
+            COUNT(DISTINCT city||'|'||state_id) AS cities,
+            COUNT(DISTINCT zip) AS zips,
+            MAX(payout) AS top_payout,
+            MIN(payout) AS low_payout,
+            AVG(payout) AS avg_payout
+          FROM coverage
+          WHERE niche=? AND payout_type=? AND state_id IS NOT NULL
+          GROUP BY state_id
+          ORDER BY zips DESC`, [niche, ptype]);
+
+    // population reached per state (sum of distinct city populations)
+    const popRows = query(`SELECT state_id, SUM(pop) AS population FROM (
+            SELECT state_id, city, MAX(population) AS pop
+            FROM coverage
+            WHERE niche=? AND payout_type=? AND state_id IS NOT NULL
+            GROUP BY state_id, city
+          ) GROUP BY state_id`, [niche, ptype]);
+    const popMap = {};
+    popRows.forEach(p => { popMap[p.state_id] = p.population || 0; });
+
+    let totalZips = 0, totalCities = 0;
+    r.forEach(x => {
+      x.avg_payout = x.avg_payout ? Math.round(x.avg_payout * 100) / 100 : null;
+      x.population = popMap[x.state_id] || 0;
+      totalZips += x.zips; totalCities += x.cities;
+    });
+    return { niche, payout_type: ptype, states: r,
+             state_count: r.length, total_zips: totalZips, total_cities: totalCities };
   }
 
   function stateSummary(state) {

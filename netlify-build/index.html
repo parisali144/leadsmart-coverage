@@ -282,6 +282,24 @@
   .zmore-link{cursor:pointer;color:var(--acc);font-size:13px;font-weight:560}
   .zmore-link:hover{text-decoration:underline}
   @media(max-width:760px){.sz-grid2{grid-template-columns:1fr}}
+
+  /* By Niche → States view */
+  tbody tr.nstate-row{cursor:pointer}
+  tbody tr.nstate-row:hover{background:var(--panel2)}
+  .state-pill{display:inline-block;font-weight:680;font-size:13px;color:var(--ink);
+              background:var(--bg2);border:1px solid var(--line2);border-radius:7px;padding:3px 10px;letter-spacing:.02em}
+  tbody tr.nstate-row:hover .state-pill{border-color:var(--acc-line)}
+  .zipbarwrap{display:inline-flex;align-items:center;gap:9px;justify-content:flex-end}
+  .zipbar{height:7px;border-radius:4px;background:linear-gradient(90deg,var(--acc),var(--acc-d));flex:0 0 auto;opacity:.75}
+  #nicheResult th[data-nsk]{cursor:pointer}
+  /* When browsing by state, city-only sidebar controls are not relevant */
+  .niche-sidebar.states-mode #presets,
+  .niche-sidebar.states-mode #npreset,
+  .niche-sidebar.states-mode #fState,
+  .niche-sidebar.states-mode #fCity,
+  .niche-sidebar.states-mode .adv-grid,
+  .niche-sidebar.states-mode .profit-strip{opacity:.4;pointer-events:none}
+  .niche-sidebar.states-mode .sb-group.city-only > .sb-label::after{content:' · cities only';color:var(--ink3);font-weight:400;letter-spacing:0;text-transform:none}
   .profit{font-weight:680;font-variant-numeric:tabular-nums}
   .profit.pos{color:var(--good)} .profit.neg{color:var(--bad)}
   .rank{color:var(--ink3);font-variant-numeric:tabular-nums;width:30px;font-size:13px}
@@ -426,6 +444,14 @@
       </div>
 
       <div class="sb-group">
+        <div class="sb-label">View by</div>
+        <div class="ptype-toggle ptype-full" id="viewToggle">
+          <button data-view="cities" class="on">Cities</button>
+          <button data-view="states">States</button>
+        </div>
+      </div>
+
+      <div class="sb-group">
         <div class="sb-label">Quick view</div>
         <div class="quick-views vertical" id="presets">
           <button class="qv on" data-preset="gems" title="Top payout in small markets (pop < 50k)">
@@ -527,7 +553,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="data.js?v=2026-06-06-statezips"></script>
+<script src="data.js?v=2026-06-06-nichestates"></script>
 <script>
 const $=s=>document.querySelector(s);
 const fmt=n=>n==null?'—':Number(n).toLocaleString();
@@ -748,12 +774,18 @@ async function showCompare(){
   $('#clrcmp').onclick=()=>{CMP=[];if(CURRENT)renderCity();};}
 
 /* ===================== BY NICHE ===================== */
-const NICHE={loaded:false,niche:null,ptype:null,sort:'score',dir:-1,offset:0,limit:50,last:null};
+const NICHE={loaded:false,niche:null,ptype:null,sort:'score',dir:-1,offset:0,limit:50,last:null,view:'cities',ssort:'zips'};
 function initNiche(){
   NICHE.loaded=true;
   // Niche dropdown (replaces 17-chip wall)
   $('#nichePick').innerHTML=META.niches.map(n=>`<option value="${n}">${n}</option>`).join('');
   $('#nichePick').addEventListener('change',e=>selectNiche(e.target.value));
+  // Cities / States view toggle
+  document.querySelectorAll('#viewToggle button').forEach(b=>b.onclick=()=>{
+    NICHE.view=b.dataset.view;
+    document.querySelectorAll('#viewToggle button').forEach(x=>x.classList.toggle('on',x.dataset.view===NICHE.view));
+    $('#tab-niche .niche-sidebar').classList.toggle('states-mode',NICHE.view==='states');
+    NICHE.offset=0;loadNiche();});
   // Filter & advanced controls
   ['fState','fCity','fMinPay','fMaxPay','fMinPop','fMaxPop','fMinZip','fDensity'].forEach(id=>{
     $('#'+id).addEventListener(id==='fCity'?'input':'change',()=>{NICHE.offset=0;loadNiche();});});
@@ -815,7 +847,72 @@ function nicheParams(extra={}){
   const map={fState:'state',fCity:'q',fMinPay:'min_payout',fMaxPay:'max_payout',fMinPop:'min_pop',fMaxPop:'max_pop',fMinZip:'min_zips',fDensity:'density'};
   for(const[id,key]of Object.entries(map)){const v=$('#'+id).value.trim();if(v)p.set(key,v);}
   return p;}
-async function loadNiche(){const r=await j('/api/niche?'+nicheParams().toString());NICHE.last=r;renderNiche(r);}
+async function loadNiche(){
+  if(NICHE.view==='states'){
+    const r=await j(`/api/niche_states?niche=${encodeURIComponent(NICHE.niche)}&ptype=${encodeURIComponent(NICHE.ptype)}`);
+    NICHE.lastStates=r;renderNicheStates(r);return;
+  }
+  const r=await j('/api/niche?'+nicheParams().toString());NICHE.last=r;renderNiche(r);
+}
+const NSTATE_SORTS={
+  zips:(a,b)=>b.zips-a.zips,
+  cities:(a,b)=>b.cities-a.cities,
+  payout:(a,b)=>b.top_payout-a.top_payout,
+  low:(a,b)=>a.low_payout-b.low_payout,
+  avg:(a,b)=>(b.avg_payout||0)-(a.avg_payout||0),
+  population:(a,b)=>(b.population||0)-(a.population||0),
+  state:(a,b)=>a.state_id.localeCompare(b.state_id),
+};
+function renderNicheStates(r){
+  if(!r)return;
+  const states=[...r.states].sort(NSTATE_SORTS[NICHE.ssort]||NSTATE_SORTS.zips);
+  const maxZips=Math.max(1,...r.states.map(s=>s.zips));
+  let h=`<div class="hero">
+     <div class="big">${r.niche}<span class="ptype">${r.payout_type}</span></div>
+     <span class="pill"><b>${fmt(r.state_count)}</b> states</span>
+     <span class="pill"><b>${fmt(r.total_cities)}</b> cities</span>
+     <span class="pill"><b>${fmt(r.total_zips)}</b> ZIPs total</span></div>
+     <div class="hint-line">States ranked by ZIP coverage for ${r.niche}. Click a state to see its cities.</div>`;
+  h+=`<div class="tablecard"><table><thead><tr>
+     <th class="rank">#</th><th data-nsk="state">STATE</th>
+     <th class="num" data-nsk="cities">CITIES</th>
+     <th class="num" data-nsk="zips">ZIPS</th>
+     <th class="num" data-nsk="payout">PAYOUT RANGE</th>
+     <th class="num opt" data-nsk="avg">AVG PAYOUT</th></tr></thead><tbody>`;
+  states.forEach((s,i)=>{
+    const range=(s.low_payout!=null&&s.low_payout<s.top_payout)
+      ? `<span class="pay">${usd(s.top_payout)}</span><span class="range">${usd(s.low_payout)}–${usd(s.top_payout)}</span>`
+      : `<span class="pay">${usd(s.top_payout)}</span>`;
+    const barPct=Math.round(100*s.zips/maxZips);
+    h+=`<tr class="nstate-row" data-s="${s.state_id}" title="Click to see ${s.state_id} cities for ${r.niche}">
+      <td class="rank">${i+1}</td>
+      <td><span class="state-pill">${s.state_id}</span></td>
+      <td class="num">${fmt(s.cities)}</td>
+      <td class="num"><span class="zipbarwrap"><span class="zipbar" style="width:${Math.max(6,barPct*0.5)}px"></span><b>${fmt(s.zips)}</b></span></td>
+      <td class="num">${range}</td>
+      <td class="num opt dim">${usd(s.avg_payout)}</td></tr>`;});
+  if(!states.length)h+=`<tr><td colspan="6" style="color:var(--ink3);padding:32px;text-align:center">No coverage for this niche.</td></tr>`;
+  h+=`</tbody></table></div>
+    <div class="row-actions"><button class="btn ghost sm" id="nsCsv">Export states CSV</button></div>`;
+  $('#nicheResult').innerHTML=h;
+  document.querySelectorAll('#nicheResult th[data-nsk]').forEach(t=>t.onclick=()=>{NICHE.ssort=t.dataset.nsk;renderNicheStates(r);});
+  document.querySelectorAll('#nicheResult .nstate-row').forEach(tr=>tr.onclick=()=>{
+    // drill into Cities view filtered to this state
+    NICHE.view='cities';
+    document.querySelectorAll('#viewToggle button').forEach(x=>x.classList.toggle('on',x.dataset.view==='cities'));
+    $('#tab-niche .niche-sidebar').classList.remove('states-mode');
+    document.querySelectorAll('#presets .qv').forEach(p=>p.classList.remove('on'));
+    ['fCity','fMinPay','fMaxPay','fMinPop','fMaxPop','fMinZip','fDensity'].forEach(id=>$('#'+id).value='');
+    $('#fState').value=tr.dataset.s;NICHE.sort='payout';
+    document.querySelectorAll('#npreset button').forEach(x=>x.classList.toggle('on',x.dataset.k==='payout'));
+    NICHE.offset=0;loadNiche();});
+  $('#nsCsv').onclick=()=>{
+    const head=['rank','state','niche','payout_type','cities','zips','low_payout','top_payout','avg_payout'];
+    const lines=[head.join(',')];
+    states.forEach((s,i)=>lines.push([i+1,s.state_id,r.niche,r.payout_type,s.cities,s.zips,s.low_payout,s.top_payout,s.avg_payout].map(v=>`"${(''+(v==null?'':v)).replace(/"/g,'""')}"`).join(',')));
+    dl(lines.join('\n'),`leadsmart_${r.niche.replace(/\s+/g,'_')}_${r.payout_type}_by_state.csv`);toast('Exported states CSV');
+  };
+}
 function profitOf(payout){const cpc=parseFloat($('#cCPC').value);const cpl=parseFloat($('#cCPL').value)||15;
   if(!cpc||cpc<=0)return null;return payout-cpc*cpl;}
 function renderNiche(r){

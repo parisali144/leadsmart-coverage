@@ -165,6 +165,7 @@
 
     '/api/niche': (q) => nicheCities(q),
     '/api/state': (q) => stateSummary(q.state || ''),
+    '/api/state_zips': (q) => stateNicheZips(q.state || '', q.niche || '', q.ptype || 'CPL', q.dir),
     '/api/states': () => query(`SELECT state_id,
             COUNT(DISTINCT niche) niches, COUNT(DISTINCT zip) zips,
             COUNT(DISTINCT city||"|"||state_id) cities
@@ -308,18 +309,69 @@
 
   function stateSummary(state) {
     state = (state || '').toUpperCase();
-    const r = query(`SELECT niche,payout_type,
-            COUNT(*) cities, SUM(zips) zips, MAX(top_payout) top_payout,
-            AVG(avg_payout) avg_payout, SUM(COALESCE(pop,0)) population
-          FROM (
-            SELECT niche,payout_type,city,state_id,
-                   COUNT(DISTINCT zip) zips, MAX(payout) top_payout,
-                   AVG(payout) avg_payout, MAX(population) pop
+    // Per niche/type in this state: ZIP count, distinct cities, payout range
+    // (lowest → highest), average, and population reached.
+    const r = query(`SELECT niche, payout_type,
+            COUNT(DISTINCT city||'|'||state_id) AS cities,
+            COUNT(DISTINCT zip) AS zips,
+            MAX(payout) AS top_payout,
+            MIN(payout) AS low_payout,
+            AVG(payout) AS avg_payout
+          FROM coverage WHERE state_id=?
+          GROUP BY niche, payout_type
+          ORDER BY top_payout DESC`, [state]);
+
+    // population reached per niche (distinct city populations summed)
+    const popRows = query(`SELECT niche, payout_type, SUM(pop) AS population FROM (
+            SELECT niche, payout_type, city, state_id, MAX(population) AS pop
             FROM coverage WHERE state_id=?
-            GROUP BY niche,payout_type,city,state_id
-          ) GROUP BY niche,payout_type ORDER BY top_payout DESC`, [state]);
-    r.forEach(x => { x.avg_payout = x.avg_payout ? Math.round(x.avg_payout * 100) / 100 : null; });
+            GROUP BY niche, payout_type, city, state_id
+          ) GROUP BY niche, payout_type`, [state]);
+    const popMap = {};
+    popRows.forEach(p => { popMap[p.niche + '|' + p.payout_type] = p.population || 0; });
+
+    r.forEach(x => {
+      x.avg_payout = x.avg_payout ? Math.round(x.avg_payout * 100) / 100 : null;
+      x.population = popMap[x.niche + '|' + x.payout_type] || 0;
+    });
     return { state, count: r.length, niches: r };
+  }
+
+  function stateNicheZips(state, niche, ptype, sortDir) {
+    // Every ZIP for one niche+type across the whole state, with its city and
+    // payout. Sorted by payout (default lowest→highest so people see the floor
+    // first), plus a payout-tier distribution and top-city rollup.
+    state = (state || '').toUpperCase();
+    const dir = sortDir === 'desc' ? 'DESC' : 'ASC';
+    const rows = query(`SELECT zip, city, payout, population, county_name AS county
+          FROM coverage
+          WHERE state_id=? AND niche=? AND payout_type=?
+          ORDER BY payout ${dir}, zip ASC`, [state, niche, ptype]);
+
+    // payout-tier distribution (how many ZIPs at each distinct payout)
+    const tierMap = {};
+    rows.forEach(x => { tierMap[x.payout] = (tierMap[x.payout] || 0) + 1; });
+    const tiers = Object.keys(tierMap)
+      .map(p => ({ payout: +p, zips: tierMap[p] }))
+      .sort((a, b) => b.payout - a.payout);
+
+    // top cities by best payout in this state for this niche
+    const cityMap = {};
+    rows.forEach(x => {
+      if (!x.city) return;
+      const c = cityMap[x.city] = cityMap[x.city] || { city: x.city, zips: 0, max: 0, min: Infinity, population: x.population };
+      c.zips++; if (x.payout > c.max) c.max = x.payout; if (x.payout < c.min) c.min = x.payout;
+    });
+    const cities = Object.values(cityMap).sort((a, b) => b.max - a.max || b.zips - a.zips);
+
+    const pays = rows.map(x => x.payout);
+    return {
+      state, niche, payout_type: ptype, count: rows.length,
+      min: pays.length ? Math.min(...pays) : null,
+      max: pays.length ? Math.max(...pays) : null,
+      avg: pays.length ? Math.round(pays.reduce((a, b) => a + b, 0) / pays.length * 100) / 100 : null,
+      tiers, cities, zips: rows,
+    };
   }
 
   function bundles(q) {

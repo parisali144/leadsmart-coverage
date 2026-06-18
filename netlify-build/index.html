@@ -253,8 +253,35 @@
   .zchip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
          border-radius:8px;padding:7px 10px;font-size:13px}
   .zc-zip{font-variant-numeric:tabular-nums;color:var(--ink2);min-width:46px}
+  .zc-city{color:var(--ink3);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:88px}
   .zc-bar{height:6px;border-radius:3px;background:var(--acc);flex:0 0 auto;opacity:.55}
   .zc-pay{margin-left:auto;font-weight:680;font-variant-numeric:tabular-nums}
+
+  /* By State — niche row expand */
+  tbody tr.state-row{cursor:pointer}
+  tbody tr.state-row .row-car{color:var(--acc);font-size:11px;display:inline-block;transition:transform .15s;opacity:.65}
+  tbody tr.state-row:hover{background:var(--panel2)}
+  tbody tr.state-row:hover .row-car{opacity:1}
+  tbody tr.state-row.open{background:var(--panel2)}
+  tbody tr.state-row.open .row-car{transform:rotate(90deg);opacity:1}
+  #stateResult th[data-sk]{cursor:pointer}
+  .szhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13.5px;color:var(--ink);margin-bottom:14px}
+  .szmeta{color:var(--ink3);font-size:12.5px;font-weight:400}
+  .sz-grid2{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:22px;align-items:start}
+  .sz-sub{font-size:11px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+  .dist-row{display:flex;align-items:center;gap:9px;margin-bottom:6px;font-size:12.5px}
+  .dist-pay{min-width:58px;font-weight:680;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .dist-bar{flex:1;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden}
+  .dist-bar span{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc-d));border-radius:4px}
+  .dist-n{min-width:64px;text-align:right;color:var(--ink3);font-variant-numeric:tabular-nums}
+  .sz-sortbtns{display:inline-flex;gap:4px;text-transform:none;letter-spacing:0}
+  .szsort{cursor:pointer;font-size:11px;font-weight:540;color:var(--ink3);padding:2px 7px;border-radius:6px;border:1px solid transparent}
+  .szsort:hover{color:var(--ink)}
+  .szsort.on{background:var(--acc-soft);border-color:var(--acc-line);color:var(--acc)}
+  .zmore{margin-top:10px}
+  .zmore-link{cursor:pointer;color:var(--acc);font-size:13px;font-weight:560}
+  .zmore-link:hover{text-decoration:underline}
+  @media(max-width:760px){.sz-grid2{grid-template-columns:1fr}}
   .profit{font-weight:680;font-variant-numeric:tabular-nums}
   .profit.pos{color:var(--good)} .profit.neg{color:var(--bad)}
   .rank{color:var(--ink3);font-variant-numeric:tabular-nums;width:30px;font-size:13px}
@@ -500,7 +527,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="data.js?v=2026-06-06-theme"></script>
+<script src="data.js?v=2026-06-06-statezips"></script>
 <script>
 const $=s=>document.querySelector(s);
 const fmt=n=>n==null?'—':Number(n).toLocaleString();
@@ -889,7 +916,7 @@ async function copyKeywordsNiche(){
   navigator.clipboard.writeText(lines.join('\n')).then(()=>toast(`Copied ${lines.length} keywords`));}
 
 /* ===================== BY STATE ===================== */
-const STATE={loaded:false,cur:null};
+const STATE={loaded:false,cur:null,sort:'payout',data:null};
 async function initState(){
   STATE.loaded=true;
   const states=await j('/api/states');
@@ -897,34 +924,119 @@ async function initState(){
   document.querySelectorAll('#stategrid button').forEach(b=>b.onclick=()=>selectState(b.dataset.s));
   selectState('AZ');
 }
+const STATE_SORTS={
+  payout:(a,b)=>b.top_payout-a.top_payout,
+  low:(a,b)=>a.low_payout-b.low_payout,
+  zips:(a,b)=>b.zips-a.zips,
+  cities:(a,b)=>b.cities-a.cities,
+  population:(a,b)=>(b.population||0)-(a.population||0),
+  niche:(a,b)=>a.niche.localeCompare(b.niche),
+};
+STATE.sort='payout';
 async function selectState(st){
   STATE.cur=st;
   document.querySelectorAll('#stategrid button').forEach(b=>b.classList.toggle('on',b.dataset.s===st));
-  const d=await j('/api/state?state='+st);
+  STATE.data=await j('/api/state?state='+st);
+  renderState();
+}
+function renderState(){
+  const st=STATE.cur, d=STATE.data;
+  const niches=[...d.niches].sort(STATE_SORTS[STATE.sort]||STATE_SORTS.payout);
   const totalZips=d.niches.reduce((a,n)=>a+n.zips,0);
   let h=`<div class="hero"><div class="big">${st}</div>
-     <span class="pill"><b>${d.count}</b> niche/type markets</span>
-     <span class="pill"><b>${fmt(totalZips)}</b> total ZIPs covered</span></div>`;
+     <span class="pill"><b>${d.count}</b> niches available</span>
+     <span class="pill"><b>${fmt(totalZips)}</b> total ZIPs covered</span></div>
+     <div class="hint-line">Click any niche to see its ZIP codes and payouts (low → high) across ${st}.</div>`;
   h+=`<div class="tablecard"><table><thead><tr>
-     <th>NICHE</th><th>TYPE</th><th class="num">TOP PAYOUT</th><th class="num opt">AVG</th>
-     <th class="num">CITIES</th><th class="num">ZIPS COVERED</th><th class="num opt">POPULATION</th><th></th>
+     <th class="rank"></th>
+     <th data-sk="niche">NICHE</th><th>TYPE</th>
+     <th class="num" data-sk="payout">PAYOUT RANGE</th>
+     <th class="num opt" data-sk="population">POPULATION</th>
+     <th class="num" data-sk="cities">CITIES</th>
+     <th class="num" data-sk="zips">ZIPS</th><th></th>
      </tr></thead><tbody>`;
-  d.niches.forEach(n=>{
-    h+=`<tr><td class="niche-name">${n.niche}</td><td><span class="ptype" style="margin:0">${n.payout_type}</span></td>
-      <td class="num"><span class="pay">${usd(n.top_payout)}</span></td>
-      <td class="num opt dim">${usd(n.avg_payout)}</td>
+  niches.forEach((n,i)=>{
+    const range = (n.low_payout!=null && n.low_payout<n.top_payout)
+      ? `<span class="pay">${usd(n.top_payout)}</span><span class="range">${usd(n.low_payout)}–${usd(n.top_payout)}</span>`
+      : `<span class="pay">${usd(n.top_payout)}</span>`;
+    h+=`<tr class="state-row" data-i="${i}" title="Click to see all ${n.zips} ZIP codes and payouts in ${st}">
+      <td class="rank"><span class="row-car">▸</span></td>
+      <td class="niche-name">${n.niche}</td>
+      <td><span class="ptype" style="margin:0">${n.payout_type}</span></td>
+      <td class="num">${range}</td>
+      <td class="num opt dim">${fmt(n.population)}</td>
       <td class="num">${fmt(n.cities)}</td>
       <td class="num"><b>${fmt(n.zips)}</b></td>
-      <td class="num opt dim">${fmt(n.population)}</td>
-      <td class="num"><span class="citylink" data-n="${n.niche}" data-t="${n.payout_type}">browse →</span></td></tr>`;});
+      <td class="num"><span class="citylink browse" data-n="${n.niche}" data-t="${n.payout_type}">browse →</span></td></tr>
+      <tr class="zdetail hide" id="sd-${i}"><td colspan="8"><div class="zwrap">loading…</div></td></tr>`;});
   h+=`</tbody></table></div>`;
   $('#stateResult').innerHTML=h;
-  document.querySelectorAll('#stateResult .citylink').forEach(a=>a.onclick=()=>{
+  // column sort
+  document.querySelectorAll('#stateResult th[data-sk]').forEach(t=>t.onclick=()=>{STATE.sort=t.dataset.sk;renderState();});
+  // expand niche → ZIP detail
+  document.querySelectorAll('#stateResult .state-row').forEach(tr=>tr.onclick=e=>{
+    if(e.target.closest('.browse'))return;
+    toggleStateZips(st,niches[tr.dataset.i],tr.dataset.i,tr);
+  });
+  // browse → jumps to By Niche filtered to this state+niche
+  document.querySelectorAll('#stateResult .browse').forEach(a=>a.onclick=e=>{
+    e.stopPropagation();
     document.querySelector('.maintabs button[data-tab="niche"]').click();
     if(!NICHE.loaded)initNiche();
     $('#fState').value=st;NICHE.niche=a.dataset.n;NICHE.ptype=a.dataset.t;
-    document.querySelectorAll('#nichebar button').forEach(b=>b.classList.toggle('on',b.dataset.n===a.dataset.n));
-    selectNiche(a.dataset.n);setTimeout(()=>{$('#fState').value=st;NICHE.offset=0;loadNiche();},50);});
+    selectNiche(a.dataset.n);setTimeout(()=>{$('#fState').value=st;NICHE.offset=0;loadNiche();},60);});
+}
+const STATEZ={};
+async function toggleStateZips(st,n,i,tr){
+  const row=$('#sd-'+i);
+  if(!row.classList.contains('hide')){row.classList.add('hide');if(tr)tr.classList.remove('open');return;}
+  row.classList.remove('hide');if(tr)tr.classList.add('open');
+  const key=`${st}|${n.niche}|${n.payout_type}`;
+  const data=STATEZ[key]||(STATEZ[key]=await j(`/api/state_zips?state=${encodeURIComponent(st)}&niche=${encodeURIComponent(n.niche)}&ptype=${encodeURIComponent(n.payout_type)}`));
+  row.querySelector('.zwrap').innerHTML=renderStateZipDetail(st,n,data);
+  wireStateZipDetail(row,st,n,data);
+}
+function renderStateZipDetail(st,n,data,showAll){
+  const maxP=data.max||1;
+  // payout distribution bars (high → low)
+  const distMax=Math.max(...data.tiers.map(t=>t.zips),1);
+  const dist=data.tiers.map(t=>`<div class="dist-row">
+      <span class="dist-pay">${usd(t.payout)}</span>
+      <span class="dist-bar"><span style="width:${Math.max(3,Math.round(100*t.zips/distMax))}%"></span></span>
+      <span class="dist-n">${fmt(t.zips)} ZIP${t.zips>1?'s':''}</span></div>`).join('');
+  // ZIP chips (default: lowest payout first — the floor). Cap to 300 unless showAll.
+  const list=showAll?data.zips:data.zips.slice(0,300);
+  const chips=list.map(z=>`<div class="zchip"><span class="zc-zip">${z.zip}</span>${z.city?`<span class="zc-city">${z.city}</span>`:''}<span class="zc-bar" style="width:${Math.max(6,Math.round(100*z.payout/maxP*0.5))}px"></span><span class="zc-pay">${usd(z.payout)}</span></div>`).join('');
+  const more=(!showAll&&data.zips.length>300)?`<div class="zmore"><span class="zmore-link" data-act="all">Show all ${fmt(data.count)} ZIPs ↓</span></div>`:'';
+  return `<div class="szhead">
+      <b>${n.niche} (${n.payout_type})</b> across ${st}
+      <span class="szmeta">${fmt(data.count)} ZIPs · ${fmt(data.cities.length)} cities · payouts ${usd(data.min)} – ${usd(data.max)} · avg ${usd(data.avg)}</span>
+      <span class="zcopy" data-act="copy">copy ZIPs</span>
+      <span class="zcopy" data-act="csv">export CSV</span>
+    </div>
+    <div class="sz-grid2">
+      <div class="sz-dist"><div class="sz-sub">Payout distribution (high → low)</div>${dist}</div>
+      <div class="sz-zips">
+        <div class="sz-sub">ZIP codes <span class="sz-sortbtns"><span class="szsort ${!data._desc?'on':''}" data-act="asc">lowest first</span><span class="szsort ${data._desc?'on':''}" data-act="desc">highest first</span></span></div>
+        <div class="zgrid">${chips}</div>${more}
+      </div>
+    </div>`;
+}
+function wireStateZipDetail(row,st,n,data){
+  const rerender=(showAll)=>{row.querySelector('.zwrap').innerHTML=renderStateZipDetail(st,n,data,showAll);wireStateZipDetail(row,st,n,data);};
+  row.querySelectorAll('[data-act]').forEach(el=>el.onclick=e=>{
+    e.stopPropagation();const act=el.dataset.act;
+    if(act==='copy'){navigator.clipboard.writeText(data.zips.map(z=>z.zip).join('\n')).then(()=>toast(`Copied ${data.count} ZIPs`));}
+    else if(act==='csv'){
+      const head=['zip','city','state','niche','payout_type','payout'];
+      const lines=[head.join(',')];
+      data.zips.forEach(z=>lines.push([z.zip,z.city||'',st,n.niche,n.payout_type,z.payout].map(v=>`"${(''+(v==null?'':v)).replace(/"/g,'""')}"`).join(',')));
+      dl(lines.join('\n'),`leadsmart_${st}_${n.niche.replace(/\s+/g,'_')}_${n.payout_type}_ZIPS.csv`);toast('Exported CSV');
+    }
+    else if(act==='all'){rerender(true);}
+    else if(act==='asc'&&data._desc){data.zips.reverse();data._desc=false;rerender();}
+    else if(act==='desc'&&!data._desc){data.zips.reverse();data._desc=true;rerender();}
+  });
 }
 
 /* ===================== BUNDLES ===================== */

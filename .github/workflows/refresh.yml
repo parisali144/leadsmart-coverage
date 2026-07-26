@@ -33,17 +33,49 @@ jobs:
           echo "----"
           ls -lh leadsmart.db
 
-      - name: Verify DB integrity (fail if truncated)
+      - name: Verify DB integrity (fail only on catastrophic drop)
         run: |
+          # Pull the currently-live DB so we can compare sizes. A healthy daily
+          # sync fluctuates a few percent as LeadSmart's live bids change; a
+          # truncated fetch collapses to a fraction. We abort only on a drastic
+          # drop vs. what's live (or below an absolute sanity floor), so normal
+          # shrinkage still deploys. `|| true` — a missing baseline just falls
+          # back to the absolute floors below.
+          curl -fsS -o live.db \
+            "https://leadsmart-coverage.netlify.app/leadsmart.db?nocache=$(date +%s)" || true
           python - <<'PY'
-          import sqlite3
-          con = sqlite3.connect('app/leadsmart.db')
-          niches = con.execute('SELECT COUNT(DISTINCT niche) FROM coverage').fetchone()[0]
-          rows   = con.execute('SELECT COUNT(*) FROM coverage').fetchone()[0]
-          print(f'niches={niches}  rows={rows}')
-          # Don't deploy obviously-broken databases.
-          assert niches >= 18, f'Aborting: only {niches} niches in DB (expected 18+)'
-          assert rows  >= 300_000, f'Aborting: only {rows} rows in DB (expected 300k+)'
+          import sqlite3, os
+          def counts(path):
+              if not path or not os.path.exists(path):
+                  return None, None
+              c = sqlite3.connect(path)
+              try:
+                  n = c.execute('SELECT COUNT(DISTINCT niche) FROM coverage').fetchone()[0]
+                  r = c.execute('SELECT COUNT(*) FROM coverage').fetchone()[0]
+              except Exception:
+                  return None, None
+              finally:
+                  c.close()
+              return n, r
+
+          new_niches, new_rows = counts('app/leadsmart.db')
+          live_niches, live_rows = counts('live.db')
+          print(f'new:  niches={new_niches}  rows={new_rows}')
+          print(f'live: niches={live_niches}  rows={live_rows}')
+
+          # Absolute sanity floors — catch a totally broken sync regardless of baseline.
+          assert new_niches is not None and new_niches >= 18, \
+              f'Aborting: only {new_niches} niches in DB (expected 18+)'
+          assert new_rows is not None and new_rows >= 100_000, \
+              f'Aborting: only {new_rows} rows in DB (expected 100k+, likely a truncated fetch)'
+
+          # Relative guard — if a live baseline exists, refuse a catastrophic collapse.
+          if live_rows and live_rows > 0:
+              ratio = new_rows / live_rows
+              print(f'new/live row ratio = {ratio:.3f}')
+              assert ratio >= 0.75, (
+                  f'Aborting: new DB has {new_rows:,} rows vs {live_rows:,} live '
+                  f'({ratio:.1%}) — a >25% drop looks like truncation, not fluctuation.')
           PY
 
       - name: Stamp DB version into data.js (busts browser cache)

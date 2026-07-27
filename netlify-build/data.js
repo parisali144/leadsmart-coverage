@@ -173,6 +173,42 @@
           FROM coverage WHERE state_id IS NOT NULL GROUP BY state_id ORDER BY state_id`),
 
     '/api/bundles': (q) => bundles(q),
+
+    // Landing-page leaderboard. Precomputed by sync_supabase.py — ranking every
+    // city live needs a full scan, and sql.js is synchronous on the main thread,
+    // so doing it here would freeze the UI for ~2.5s on load. Degrades quietly
+    // if the DB predates the table (the UI just omits the leaderboard).
+    '/api/top_markets': () => {
+      const has = query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='top_markets'");
+      if (!has.length) return { markets: [], unavailable: true };
+      return { markets: query('SELECT * FROM top_markets ORDER BY rank') };
+    },
+
+    // Per-niche payout summary for the reference table in the page copy.
+    // Median (not max) is the headline number — the top payout usually exists
+    // in a handful of ZIPs and overstates what a typical market is worth.
+    '/api/niche_summary': () => {
+      const base = query(`SELECT niche, payout_type,
+              COUNT(DISTINCT zip) AS zips,
+              MIN(payout) AS min, MAX(payout) AS max, AVG(payout) AS avg
+            FROM coverage GROUP BY niche, payout_type`);
+      const med = {};
+      query(`SELECT niche, payout_type, payout AS median FROM (
+              SELECT niche, payout_type, payout,
+                     ROW_NUMBER() OVER (PARTITION BY niche, payout_type ORDER BY payout) AS rn,
+                     COUNT(*)     OVER (PARTITION BY niche, payout_type) AS n
+              FROM coverage
+            ) WHERE rn = (n + 1) / 2`)
+        .forEach(r => { med[r.niche + '|' + r.payout_type] = r.median; });
+      base.forEach(r => {
+        r.median = med[r.niche + '|' + r.payout_type];
+        if (r.median == null) r.median = Math.round(r.avg * 100) / 100;
+        r.avg = Math.round(r.avg * 100) / 100;
+      });
+      base.sort((a, b) => b.median - a.median);
+      return { niches: base };
+    },
   };
 
   // ---------- by-city helpers ----------

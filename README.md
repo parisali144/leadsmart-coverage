@@ -77,7 +77,7 @@ cd app && python sync_supabase.py
 cd ../netlify-build && cp ../app/leadsmart.db .
 python -c "import zipfile,os
 with zipfile.ZipFile('../deploy.zip','w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
-  [z.write(f) for f in ['index.html','data.js','leadsmart.db','netlify.toml','favicon.svg']]"
+  [z.write(f) for f in ['index.html','data.js','leadsmart.db','netlify.toml','favicon.svg','robots.txt','sitemap.xml']]"
 curl -X POST "https://api.netlify.com/api/v1/sites/021639a8-b4f0-46e6-8017-403569a56e1f/deploys" \
   -H "Authorization: Bearer YOUR_NETLIFY_TOKEN" \
   -H "Content-Type: application/zip" \

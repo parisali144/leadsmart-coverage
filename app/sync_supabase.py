@@ -257,9 +257,45 @@ def build():
         CREATE INDEX idx_cov_citystate ON coverage(city, state_id);
         CREATE INDEX idx_cov_zip ON coverage(zip);
         CREATE INDEX idx_cov_niche ON coverage(niche);
-        VACUUM;
     ''')
+
+    # ---- landing-page leaderboard, precomputed ----
+    # sql.js runs synchronously on the browser's main thread, and ranking every
+    # city needs a full scan of `coverage` (~2.5s in wasm). Doing that on page
+    # load would freeze the UI, so the ranking is computed once, here, in CI.
+    # "stacked" = sum of the best payout per niche in that city, i.e. what one
+    # site covering every available niche there could earn per lead round.
+    cur.execute('''
+        CREATE TABLE top_markets (
+            rank INTEGER, city TEXT, state_id TEXT,
+            niches INTEGER, zips INTEGER, population INTEGER, stacked REAL,
+            top_niche TEXT, top_payout REAL, top_ptype TEXT
+        )''')
+    leaders = cur.execute('''
+        SELECT city, state_id, COUNT(*) AS niches, SUM(mx) AS stacked,
+               MAX(pop) AS population, SUM(zc) AS zips
+        FROM (SELECT city, state_id, niche, MAX(payout) AS mx,
+                     MAX(population) AS pop, COUNT(DISTINCT zip) AS zc
+              FROM coverage WHERE city IS NOT NULL AND state_id IS NOT NULL
+              GROUP BY city, state_id, niche)
+        GROUP BY city, state_id ORDER BY stacked DESC LIMIT 12''').fetchall()
+
+    tm_rows = []
+    for i, (city, st, niches, stacked, pop, zips) in enumerate(leaders, 1):
+        top = cur.execute('''
+            SELECT niche, payout_type, MAX(payout) FROM coverage
+            WHERE city=? AND state_id=? GROUP BY niche, payout_type
+            ORDER BY 3 DESC LIMIT 1''', (city, st)).fetchone()
+        tm_rows.append((i, city, st, niches, zips, pop, round(stacked or 0, 2),
+                        top[0] if top else None,
+                        top[2] if top else None,
+                        top[1] if top else None))
+    cur.executemany('INSERT INTO top_markets VALUES (?,?,?,?,?,?,?,?,?,?)', tm_rows)
+    print(f'  top_markets: {len(tm_rows)} rows '
+          f'(leader: {tm_rows[0][1]}, {tm_rows[0][2]} @ ${tm_rows[0][6]:,.2f})' if tm_rows else '  top_markets: empty')
+
     con.commit()
+    cur.execute('VACUUM')
 
     # Report
     print(f'  coverage rows: {len(rows):,}')

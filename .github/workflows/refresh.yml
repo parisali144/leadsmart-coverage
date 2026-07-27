@@ -97,6 +97,8 @@ jobs:
           cp netlify-build/data.js         dist/
           cp netlify-build/netlify.toml    dist/
           cp netlify-build/favicon.svg     dist/
+          cp netlify-build/robots.txt      dist/
+          cp netlify-build/sitemap.xml     dist/
           cp app/leadsmart.db              dist/
           cd dist
           zip -r9 ../deploy.zip .

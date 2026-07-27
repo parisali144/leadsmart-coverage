@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# The database is a 44 MB binary asset — no value in crawling it, and it
+# wastes crawl budget on every recrawl.
+Disallow: /leadsmart.db
+
+Sitemap: https://leadsmart-coverage.netlify.app/sitemap.xml

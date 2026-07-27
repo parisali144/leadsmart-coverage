@@ -3,11 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LeadSmart Coverage Intelligence</title>
+<title>Lead Payouts by Niche, City &amp; ZIP — LeadSmart Coverage Intelligence</title>
+<meta name="description" content="Look up what home-service leads pay in any US city or ZIP code. Live payouts and coverage for 20 niches — roofing, HVAC, plumbing, water damage, mold and more.">
+<link rel="canonical" href="https://leadsmart-coverage.netlify.app/">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="favicon.svg">
 <meta name="theme-color" content="#0c0c0e">
 <meta name="google-site-verification" content="R4UtiLgMi6L34XAmhBizU3v8UJpQTma2U93kGjpJkN4" />
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="LeadSmart Coverage Intelligence">
+<meta property="og:url" content="https://leadsmart-coverage.netlify.app/">
+<meta property="og:title" content="Lead Payouts by Niche, City &amp; ZIP — LeadSmart Coverage Intelligence">
+<meta property="og:description" content="Look up what home-service leads pay in any US city or ZIP code. Live payouts and coverage for 20 niches across 41,000+ ZIP codes.">
+<meta property="og:image" content="https://leadsmart-coverage.netlify.app/favicon.svg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lead Payouts by Niche, City &amp; ZIP">
+<meta name="twitter:description" content="What home-service leads actually pay, by city and ZIP — 20 niches, 41,000+ ZIP codes, updated daily.">
+<meta name="twitter:image" content="https://leadsmart-coverage.netlify.app/favicon.svg">
 <style>
   :root{
     /* RankLocal Editor palette — neutral greyscale + vibrant orange (no blue tint) */
@@ -98,6 +112,27 @@
 
   .section-label{font-size:11.5px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin:30px 0 12px}
 
+  /* === By-city landing: top markets leaderboard (fills the pre-search state) === */
+  .lead-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+             margin:34px 0 0;flex-wrap:wrap}
+  .lead-head h2{font-size:17px;font-weight:660;letter-spacing:-.01em;margin:0}
+  .lead-head .sub{font-size:13px;color:var(--ink3)}
+  .mkt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:14px}
+  .mkt{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+       padding:15px 16px;cursor:pointer;box-shadow:var(--shadow);
+       transition:border-color .15s,transform .08s,background .15s}
+  .mkt:hover{border-color:var(--acc-line);background:var(--panel2)}
+  .mkt:active{transform:translateY(1px)}
+  .mkt .rk{font-size:10.5px;font-weight:700;color:var(--ink3);letter-spacing:.06em}
+  .mkt:nth-child(-n+3) .rk{color:var(--acc)}
+  .mkt .cy{font-size:14.5px;font-weight:620;margin:6px 0 10px;line-height:1.3}
+  .mkt .amt{font-size:19px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .mkt .amt small{font-size:11px;font-weight:520;color:var(--ink3);letter-spacing:0;margin-left:5px}
+  .mkt .meta{font-size:11.5px;color:var(--ink3);margin-top:7px;font-variant-numeric:tabular-nums}
+  @media(max-width:1000px){.mkt-grid{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:760px){.mkt-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:420px){.mkt-grid{grid-template-columns:1fr}}
+
   /* === By-Niche: sidebar + main layout === */
   .niche-layout{display:grid;grid-template-columns:268px 1fr;gap:22px;margin-top:14px;align-items:start}
   .niche-sidebar{position:sticky;top:14px;max-height:calc(100vh - 28px);overflow-y:auto;
@@ -107,6 +142,22 @@
   .niche-sidebar::-webkit-scrollbar{width:6px}
   .niche-sidebar::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
   .niche-main{min-width:0}
+  /* Result-set controls, sat above the results rather than in the filter rail */
+  .nresult-bar{display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+       background:var(--panel);border:1px solid var(--line);border-radius:12px;
+       padding:9px 14px;box-shadow:var(--shadow);margin-bottom:4px}
+  .nrb-group{display:flex;align-items:center;gap:9px;min-width:0}
+  .nrb-label{font-size:11px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;
+             color:var(--ink3);flex:0 0 auto}
+  .nresult-bar .sort-grid{display:inline-flex}
+  .nresult-bar.states-mode #npreset{opacity:.4;pointer-events:none}
+  @media(max-width:640px){
+    .nresult-bar{gap:10px;padding:9px 11px}
+    .nrb-group{width:100%}
+    .nresult-bar .seg,.nresult-bar .ptype-toggle{flex:1;overflow-x:auto;scrollbar-width:none}
+    .nresult-bar .seg::-webkit-scrollbar,.nresult-bar .ptype-toggle::-webkit-scrollbar{display:none}
+    .nresult-bar .seg button,.nresult-bar .ptype-toggle button{white-space:nowrap;flex:0 0 auto}
+  }
   /* Tabs row: tabs on the left, the persistent RankLocal CTA on the right */
   .tabs-row{display:flex;align-items:center;justify-content:space-between;gap:18px;
             margin:18px 0 0;flex-wrap:wrap}
@@ -133,6 +184,11 @@
     .tabs-row{gap:10px}
     .rl-eyebrow{display:none}
     .rl-main{font-size:12.5px}
+    /* Five tabs are wider than a phone viewport. Scroll the bar itself instead
+       of letting it push the whole page sideways. */
+    .maintabs{max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+    .maintabs::-webkit-scrollbar{display:none}
+    .maintabs button{padding:10px 14px;white-space:nowrap;flex:0 0 auto}
   }
   .sb-group{margin-bottom:16px}
   .sb-group:last-of-type{margin-bottom:10px}
@@ -351,6 +407,129 @@
   .stategrid button.on{background:var(--acc-soft);border-color:var(--acc-line);color:var(--acc)}
 
   .foot{color:var(--ink3);font-size:12.5px;margin-top:42px;padding-top:22px;border-top:1px solid var(--line);text-align:center}
+
+  /* ================== editorial / reference section ================== */
+  .seo{max-width:1020px;margin:86px auto 0;padding-top:56px;border-top:1px solid var(--line)}
+  .seo p{color:var(--ink2);font-size:14.5px;line-height:1.72;margin:0 0 13px}
+  .seo b,.seo strong{color:var(--ink);font-weight:620}
+  .seo a{color:var(--acc);text-decoration:none}
+  .seo a:hover{text-decoration:underline}
+
+  /* section opener */
+  .ed-head{text-align:center;max-width:680px;margin:0 auto}
+  .ed-badge{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:650;
+     letter-spacing:.09em;text-transform:uppercase;color:var(--acc);background:var(--acc-soft);
+     border:1px solid var(--acc-line);border-radius:99px;padding:5px 13px}
+  .ed-head h2{font-size:27px;font-weight:690;letter-spacing:-.022em;margin:17px 0 11px;line-height:1.25}
+  .ed-head p{font-size:15.5px;line-height:1.7;margin:0}
+
+  /* stat strip */
+  .ed-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:34px 0 0}
+  .ed-stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+           padding:16px 18px;box-shadow:var(--shadow)}
+  .ed-stat .n{font-size:21px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .ed-stat .l{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+
+  /* generic block */
+  .ed-sec{margin-top:60px}
+  .ed-kicker{font-size:11px;font-weight:660;letter-spacing:.09em;text-transform:uppercase;
+             color:var(--ink3);margin-bottom:9px}
+  .ed-sec h2{font-size:21px;font-weight:670;letter-spacing:-.015em;margin:0 0 10px}
+  .ed-sec>p{max-width:76ch}
+
+  /* podium — top paying niches */
+  .podium{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
+  .pod{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:13px;
+       padding:18px;box-shadow:var(--shadow);overflow:hidden}
+  .pod:first-child{border-color:var(--acc-line)}
+  .pod:first-child::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;
+       background:linear-gradient(90deg,var(--acc),transparent)}
+  .pod .rank{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.06em}
+  .pod:first-child .rank{color:var(--acc)}
+  .pod .nm{font-size:15px;font-weight:640;margin:7px 0 12px;line-height:1.35}
+  .pod .amt{font-size:26px;font-weight:720;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+  .pod .sub{font-size:12px;color:var(--ink3);margin-top:4px;font-variant-numeric:tabular-nums}
+  .pod .tag{display:inline-block;font-size:10.5px;font-weight:560;color:var(--ink2);
+       background:var(--elevated);border-radius:5px;padding:2px 7px;margin-top:11px}
+
+  /* two-up cards (payout models) */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+  .mcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px;
+         box-shadow:var(--shadow)}
+  .mcard .ic{width:32px;height:32px;border-radius:9px;background:var(--acc-soft);
+       border:1px solid var(--acc-line);display:grid;place-items:center;color:var(--acc);font-size:15px}
+  .mcard h3{font-size:15px;font-weight:640;margin:13px 0 3px}
+  .mcard .rng{font-size:12.5px;color:var(--acc);font-weight:600;font-variant-numeric:tabular-nums;margin-bottom:9px}
+  .mcard p{font-size:13.5px;line-height:1.65;margin:0}
+
+  /* insight panel with chip groups */
+  .ipanel{background:var(--panel);border:1px solid var(--line);border-radius:13px;
+          padding:20px 22px;margin-top:20px;box-shadow:var(--shadow)}
+  .ipanel>p{max-width:none;font-size:14px}
+  .chipset{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px;
+           padding-top:16px;border-top:1px solid var(--line)}
+  .chipset .hd{font-size:11px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;
+               color:var(--ink3);margin-bottom:9px}
+  /* scoped to .chips — the tool already uses a bare .chip for recent searches */
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chips .chip{font-size:12px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;
+        padding:4px 9px;color:var(--ink2);font-variant-numeric:tabular-nums;cursor:default}
+  .chips .chip b{color:var(--ink);font-weight:620}
+  .chips .chip.hot{border-color:var(--acc-line);background:var(--acc-soft)}
+  .chips .chip.hot b{color:var(--acc)}
+
+  /* how-to-use grid */
+  .usegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
+  .ucard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:17px;
+         box-shadow:var(--shadow)}
+  .ucard .ic{color:var(--acc);font-size:14px}
+  .ucard h3{font-size:13.5px;font-weight:640;margin:9px 0 5px}
+  .ucard p{font-size:12.8px;line-height:1.6;margin:0;color:var(--ink3)}
+
+  /* faq accordion */
+  .faq{margin-top:20px;background:var(--panel);border:1px solid var(--line);
+       border-radius:13px;box-shadow:var(--shadow);overflow:hidden}
+  .faq details{border-bottom:1px solid var(--line)}
+  .faq details:last-child{border-bottom:0}
+  .faq summary{list-style:none;cursor:pointer;padding:15px 20px;font-size:14.5px;font-weight:590;
+       display:flex;align-items:center;justify-content:space-between;gap:16px;transition:color .15s}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary:hover{color:var(--acc)}
+  .faq summary::after{content:'+';color:var(--acc);font-size:17px;font-weight:400;flex:0 0 auto;
+       transition:transform .18s;line-height:1}
+  .faq details[open] summary::after{transform:rotate(45deg)}
+  .faq details[open] summary{color:var(--ink)}
+  .faq .ans{padding:0 20px 17px;color:var(--ink2);font-size:13.8px;line-height:1.7;max-width:82ch}
+
+  /* closing note */
+  .ed-fine{margin-top:52px;padding-top:22px;border-top:1px solid var(--line);
+           display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  .ed-fine p{font-size:12.8px;line-height:1.66;color:var(--ink3);margin:0}
+
+  .seo .tablecard{margin-top:20px}
+  .seo thead th{cursor:default}
+  .seo thead th:hover{color:var(--ink3)}
+  .seo tbody tr:hover td{background:var(--panel2)}
+
+  @media(max-width:900px){
+    .ed-stats{grid-template-columns:repeat(2,1fr)}
+    .podium,.duo,.usegrid,.chipset,.ed-fine{grid-template-columns:1fr}
+    .usegrid{grid-template-columns:1fr 1fr}
+  }
+  @media(max-width:720px){
+    .seo{margin-top:52px;padding-top:38px}
+    .ed-head h2{font-size:22px}
+    .ed-head p{font-size:14.5px}
+    .ed-sec{margin-top:44px}
+    .ed-sec h2{font-size:19px}
+    .usegrid{grid-template-columns:1fr}
+    /* Drop the payout-model column on phones (it's explained in the cards
+       above) so NICHE + ZIPS + MEDIAN fit without sideways scrolling.
+       RANGE is already hidden by .opt. */
+    .seo .mopt{display:none}
+    .seo .tablecard{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .seo th,.seo td{padding:10px 12px;font-size:13px}
+  }
   .hide{display:none}
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--elevated);
          border:1px solid var(--acc-line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:14px;
@@ -391,7 +570,7 @@
     <div class="logo">L</div>
     <div>
       <h1>LeadSmart <span style="color:var(--acc)">Coverage Intelligence</span></h1>
-      <div class="sub">Market research for lead-gen — coverage, payouts, ZIPs & profit</div>
+      <div class="sub">What home-service leads pay — payouts, ZIP coverage &amp; profit by niche and city</div>
     </div>
   </div>
   <div class="hstat" id="hstat"></div>
@@ -427,6 +606,7 @@
     <button class="btn" id="go">Check</button>
   </div>
   <div class="recent hide" id="recent"></div>
+  <div id="cityLanding" class="hide"></div>
   <div id="cityResult"></div>
 </div>
 
@@ -445,14 +625,6 @@
       </div>
 
       <div class="sb-group">
-        <div class="sb-label">View by</div>
-        <div class="ptype-toggle ptype-full" id="viewToggle">
-          <button data-view="cities" class="on">Cities</button>
-          <button data-view="states">States</button>
-        </div>
-      </div>
-
-      <div class="sb-group">
         <div class="sb-label">Quick view</div>
         <div class="quick-views vertical" id="presets">
           <button class="qv on" data-preset="gems" title="Top payout in small markets (pop < 50k)">
@@ -465,16 +637,6 @@
             <span class="qv-ico">≡</span><span>Multi-ZIP</span></button>
           <button class="qv" data-preset="all" title="No filter — browse all">
             <span class="qv-ico">⌕</span><span>All cities</span></button>
-        </div>
-      </div>
-
-      <div class="sb-group">
-        <div class="sb-label">Sort</div>
-        <div class="seg sort-grid" id="npreset">
-          <button data-k="score" class="on">Best fit</button>
-          <button data-k="payout">Payout</button>
-          <button data-k="population">Smallest</button>
-          <button data-k="zips">Most ZIPs</button>
         </div>
       </div>
 
@@ -517,7 +679,30 @@
     </aside>
 
     <!-- RIGHT MAIN -->
-    <main class="niche-main" id="nicheResult"></main>
+    <main class="niche-main">
+      <!-- View + Sort live here, not in the sidebar: they control the result set
+           rather than filtering it. Kept OUTSIDE #nicheResult because renderNiche()
+           replaces that element's innerHTML on every load. -->
+      <div class="nresult-bar" id="nicheToolbar">
+        <div class="nrb-group">
+          <span class="nrb-label">View</span>
+          <div class="ptype-toggle" id="viewToggle">
+            <button data-view="cities" class="on">Cities</button>
+            <button data-view="states">States</button>
+          </div>
+        </div>
+        <div class="nrb-group">
+          <span class="nrb-label">Sort</span>
+          <div class="seg sort-grid" id="npreset">
+            <button data-k="score" class="on">Best fit</button>
+            <button data-k="payout">Payout</button>
+            <button data-k="population">Smallest</button>
+            <button data-k="zips">Most ZIPs</button>
+          </div>
+        </div>
+      </div>
+      <div id="nicheResult"></div>
+    </main>
   </div>
 </div>
 
@@ -550,11 +735,220 @@
   <div id="savedResult"></div>
 </div>
 
+<section class="seo">
+
+  <div class="ed-head">
+    <span class="ed-badge">Payout reference</span>
+    <h2>What home-service leads actually pay</h2>
+    <p>Keyword tools tell you how many people search for &ldquo;roofing contractor Tulsa.&rdquo;
+    They can&rsquo;t tell you whether a roofing lead from Tulsa is worth $12 or $120 &mdash; or
+    whether anyone buys leads there at all. That&rsquo;s what this data is for.</p>
+  </div>
+
+  <div class="ed-stats">
+    <div class="ed-stat"><div class="n">20</div><div class="l">Niches tracked</div></div>
+    <div class="ed-stat"><div class="n">41,000+</div><div class="l">ZIP codes covered</div></div>
+    <div class="ed-stat"><div class="n">$1&ndash;$507</div><div class="l">Payout range</div></div>
+    <div class="ed-stat"><div class="n">Daily</div><div class="l">Data refresh</div></div>
+  </div>
+
+  <div class="ed-sec">
+    <div class="ed-kicker">Highest paying</div>
+    <h2>Lead payouts by niche</h2>
+    <p>Ranked by <b>median payout</b> &mdash; the middle ZIP code, not the best one. Headline
+    maximums make poor planning numbers because they usually exist in a handful of ZIPs; the
+    median is what a typical market in that niche is actually worth.</p>
+
+    <div class="podium" id="podium">
+      <div class="pod"><div class="rank">01</div><div class="nm">Biohazard cleanup</div>
+        <div class="amt">$210.50</div><div class="sub">$178.00&ndash;$299.50 &middot; 11,859 ZIPs</div>
+        <span class="tag">Cost per lead</span></div>
+      <div class="pod"><div class="rank">02</div><div class="nm">Fire damage removal</div>
+        <div class="amt">$193.00</div><div class="sub">$48.50&ndash;$365.50 &middot; 19,165 ZIPs</div>
+        <span class="tag">Cost per lead</span></div>
+      <div class="pod"><div class="rank">03</div><div class="nm">Water damage restoration</div>
+        <div class="amt">$189.00</div><div class="sub">$48.50&ndash;$507.00 &middot; 24,556 ZIPs</div>
+        <span class="tag">Cost per lead</span></div>
+    </div>
+
+<div class="tablecard">
+    <table id="nicheRef">
+      <thead><tr>
+        <th>NICHE</th><th class="mopt">PAYOUT MODEL</th>
+        <th class="num">ZIPS COVERED</th><th class="num">MEDIAN PAYOUT</th><th class="num opt">RANGE</th>
+      </tr></thead>
+      <tbody>
+        <tr data-n="Biohazard" data-t="CPL"><td class="niche-name">Biohazard cleanup</td><td class="mopt">Cost per lead</td><td class="num">11,859</td><td class="num"><span class="pay">$210.50</span></td><td class="num opt">$178.00–$299.50</td></tr>
+        <tr data-n="Fire Damage Removal" data-t="CPL"><td class="niche-name">Fire damage removal</td><td class="mopt">Cost per lead</td><td class="num">19,165</td><td class="num"><span class="pay">$193.00</span></td><td class="num opt">$48.50–$365.50</td></tr>
+        <tr data-n="Water Damage" data-t="CPL"><td class="niche-name">Water damage restoration</td><td class="mopt">Cost per lead</td><td class="num">24,556</td><td class="num"><span class="pay">$189.00</span></td><td class="num opt">$48.50–$507.00</td></tr>
+        <tr data-n="Kitchen" data-t="CPL"><td class="niche-name">Kitchen remodeling</td><td class="mopt">Cost per lead</td><td class="num">2,667</td><td class="num"><span class="pay">$116.50</span></td><td class="num opt">$34.00–$127.00</td></tr>
+        <tr data-n="Siding" data-t="CPL"><td class="niche-name">Siding</td><td class="mopt">Cost per lead</td><td class="num">7,188</td><td class="num"><span class="pay">$115.50</span></td><td class="num opt">$40.50–$144.00</td></tr>
+        <tr data-n="Windows" data-t="CPL"><td class="niche-name">Window replacement</td><td class="mopt">Cost per lead</td><td class="num">8,415</td><td class="num"><span class="pay">$102.50</span></td><td class="num opt">$40.00–$181.00</td></tr>
+        <tr data-n="Garage Door" data-t="CPL"><td class="niche-name">Garage doors</td><td class="mopt">Cost per lead</td><td class="num">3,863</td><td class="num"><span class="pay">$74.00</span></td><td class="num opt">$13.00–$86.00</td></tr>
+        <tr data-n="Mold Removal" data-t="CPL"><td class="niche-name">Mold removal</td><td class="mopt">Cost per lead</td><td class="num">15,136</td><td class="num"><span class="pay">$65.50</span></td><td class="num opt">$15.00–$159.00</td></tr>
+        <tr data-n="Foundation Repair" data-t="CPL"><td class="niche-name">Foundation repair</td><td class="mopt">Cost per lead</td><td class="num">4,120</td><td class="num"><span class="pay">$54.50</span></td><td class="num opt">$16.00–$96.00</td></tr>
+        <tr data-n="Pest Control" data-t="Call"><td class="niche-name">Pest control</td><td class="mopt">Pay per call</td><td class="num">31,813</td><td class="num"><span class="pay">$42.50</span></td><td class="num opt">$32.50–$42.50</td></tr>
+        <tr data-n="Roofing" data-t="Call"><td class="niche-name">Roofing</td><td class="mopt">Pay per call</td><td class="num">29,608</td><td class="num"><span class="pay">$41.25</span></td><td class="num opt">$4.37–$166.95</td></tr>
+        <tr data-n="Deck" data-t="CPL"><td class="niche-name">Decks</td><td class="mopt">Cost per lead</td><td class="num">1,633</td><td class="num"><span class="pay">$39.50</span></td><td class="num opt">$29.50–$119.50</td></tr>
+        <tr data-n="HVAC" data-t="Call"><td class="niche-name">HVAC</td><td class="mopt">Pay per call</td><td class="num">23,886</td><td class="num"><span class="pay">$37.80</span></td><td class="num opt">$3.30–$147.00</td></tr>
+        <tr data-n="Landscaping" data-t="CPL"><td class="niche-name">Landscaping</td><td class="mopt">Cost per lead</td><td class="num">1,284</td><td class="num"><span class="pay">$33.50</span></td><td class="num opt">$26.50–$42.50</td></tr>
+        <tr data-n="Gutters" data-t="Call"><td class="niche-name">Gutters</td><td class="mopt">Pay per call</td><td class="num">36,714</td><td class="num"><span class="pay">$32.50</span></td><td class="num opt">flat nationwide</td></tr>
+        <tr data-n="Plumbing" data-t="Call"><td class="niche-name">Plumbing</td><td class="mopt">Pay per call</td><td class="num">26,011</td><td class="num"><span class="pay">$31.97</span></td><td class="num opt">$3.47–$122.85</td></tr>
+        <tr data-n="Bathroom Remodeling" data-t="Call"><td class="niche-name">Bathroom remodeling</td><td class="mopt">Pay per call</td><td class="num">30,107</td><td class="num"><span class="pay">$31.08</span></td><td class="num opt">$6.93–$123.20</td></tr>
+        <tr data-n="Electrical" data-t="Call"><td class="niche-name">Electrical</td><td class="mopt">Pay per call</td><td class="num">19,328</td><td class="num"><span class="pay">$24.75</span></td><td class="num opt">$1.04–$74.03</td></tr>
+        <tr data-n="Tree Services" data-t="Call"><td class="niche-name">Tree services</td><td class="mopt">Pay per call</td><td class="num">4,510</td><td class="num"><span class="pay">$9.63</span></td><td class="num opt">$2.89–$27.84</td></tr>
+        <tr data-n="Appliance" data-t="Call"><td class="niche-name">Appliance repair</td><td class="mopt">Pay per call</td><td class="num">29,766</td><td class="num"><span class="pay">$5.50</span></td><td class="num opt">$1.93–$36.75</td></tr>
+      </tbody>
+    </table>
+  </div>
+    <div class="hint-line" id="nicheRefNote">Figures refresh from the live database each time this page loads.</div>
+  </div>
+
+  <div class="ed-sec">
+    <div class="ed-kicker">How you get paid</div>
+    <h2>Cost per lead vs pay per call</h2>
+    <p>The network buys on two different models, and mixing them up will wreck your maths.</p>
+    <div class="duo">
+      <div class="mcard">
+        <div class="ic">$</div>
+        <h3>Cost per lead (CPL)</h3>
+        <div class="rng">Median payouts $33 &ndash; $210</div>
+        <p>You&rsquo;re paid when a submitted lead converts to a booked appointment. Payouts are
+        much higher &mdash; restoration niches clear $180&ndash;$500 &mdash; because a lot of raw
+        leads never make it that far.</p>
+      </div>
+      <div class="mcard">
+        <div class="ic">&#9743;</div>
+        <h3>Pay per call</h3>
+        <div class="rng">Median payouts $5 &ndash; $43</div>
+        <p>You&rsquo;re paid for a qualified inbound phone call that stays connected past a minimum
+        duration. Payouts are lower per event, but a far larger share of your traffic qualifies.</p>
+      </div>
+    </div>
+    <p style="margin-top:14px">A $210 biohazard CPL payout and a $32.50 gutters call payout are not
+    comparable numbers. Judge each against the traffic cost and conversion rate of its own model,
+    not against each other.</p>
+  </div>
+
+  <div class="ed-sec">
+    <div class="ed-kicker">Geography</div>
+    <h2>Why payouts vary between ZIP codes</h2>
+    <p>Buyers bid per ZIP based on how badly contractors in that area want work, so the same niche
+    can pay several times more one county over. Electrical spans $1.04 to $74.03 &mdash; a 71&times;
+    spread. HVAC, Plumbing and Roofing behave the same way.</p>
+    <div class="ipanel">
+      <p><b>But not every niche is priced geographically.</b> Gutters pays one flat rate in all
+      36,000+ of its ZIP codes. In these niches there is no high-payout ZIP to hunt for and ranking
+      cities by payout is meaningless &mdash; your only lever is search volume and cost per click.</p>
+      <div class="chipset">
+        <div>
+          <div class="hd">Genuinely geo-priced</div>
+          <div class="chips">
+            <span class="chip hot">Plumbing <b>1,351</b></span>
+            <span class="chip hot">HVAC <b>964</b></span>
+            <span class="chip hot">Roofing <b>896</b></span>
+            <span class="chip hot">Bathroom <b>683</b></span>
+            <span class="chip hot">Electrical <b>433</b></span>
+          </div>
+        </div>
+        <div>
+          <div class="hd">Flat or near-flat</div>
+          <div class="chips">
+            <span class="chip">Gutters <b>1</b></span>
+            <span class="chip">Pest Control <b>2</b></span>
+            <span class="chip">Landscaping <b>8</b></span>
+            <span class="chip">Kitchen <b>12</b></span>
+            <span class="chip">Foundation <b>13</b></span>
+            <span class="chip">Deck <b>16</b></span>
+            <span class="chip">Biohazard <b>20</b></span>
+            <span class="chip">Garage Door <b>22</b></span>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:15px;font-size:12.5px;color:var(--ink3)">Distinct payout values per niche
+      across the whole country.</p>
+    </div>
+  </div>
+
+  <div class="ed-sec">
+    <div class="ed-kicker">The tool</div>
+    <h2>How to use it</h2>
+    <div class="usegrid">
+      <div class="ucard"><div class="ic">&#8981;</div><h3>By city</h3>
+        <p>Enter any city or ZIP code to see every niche bought there, payout ranges, ZIP coverage
+        and which niches stack on a single ZIP.</p></div>
+      <div class="ucard"><div class="ic">&#9733;</div><h3>By niche</h3>
+        <p>Pick one niche and rank every city or state by payout, market size or coverage. The
+        profit estimator subtracts your ad cost.</p></div>
+      <div class="ucard"><div class="ic">&#9635;</div><h3>By state</h3>
+        <p>See which niches have the deepest coverage in a state, then drill into individual ZIPs
+        and their payout tiers.</p></div>
+      <div class="ucard"><div class="ic">&#8853;</div><h3>Bundles</h3>
+        <p>Find ZIP codes where several niches are bought at once, so one site or campaign can
+        monetise more than one service.</p></div>
+    </div>
+    <p style="margin-top:16px">A high payout on its own is not an opportunity. It has to clear your
+    cost of acquisition &mdash; a $500 lead in a town nobody searches from is worth less than a $40
+    lead in a city with real demand. Use these figures as the revenue side of the equation and pair
+    them with keyword volume and competition data before committing to a market.</p>
+  </div>
+
+  <div class="ed-sec">
+    <div class="ed-kicker">Questions</div>
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      <details><summary>How much do home-service leads pay?</summary>
+        <div class="ans">It depends heavily on the niche. In this network, restoration work pays
+        most &mdash; biohazard cleanup, fire damage and water damage all sit near $190&ndash;$210 at
+        the median and reach $500 in the strongest ZIP codes. Remodeling niches such as kitchens,
+        siding and windows run roughly $100&ndash;$120. Trade call niches such as plumbing, HVAC and
+        roofing typically pay $30&ndash;$45 per qualified call, and appliance repair is the cheapest
+        at around $5.50.</div></details>
+      <details><summary>Which lead generation niche pays the most?</summary>
+        <div class="ans">By median payout, biohazard cleanup is the highest at about $210 per lead,
+        followed by fire damage removal and water damage restoration. Water damage has the single
+        highest payout of any ZIP code in the network at $507. These are all cost-per-lead niches,
+        so payout is only earned on a booked appointment.</div></details>
+      <details><summary>How do I check whether my city or ZIP code is covered?</summary>
+        <div class="ans">Use the &ldquo;By city&rdquo; search at the top of this page. Enter a city
+        name or a five-digit ZIP code and you&rsquo;ll see every niche bought in that market with
+        its payouts and ZIP counts. If a city isn&rsquo;t covered, the tool automatically lists
+        covered cities within 40 miles.</div></details>
+      <details><summary>What&rsquo;s the difference between CPL and pay per call?</summary>
+        <div class="ans">Cost per lead pays when a submitted lead becomes a booked appointment,
+        which is why those payouts are much larger. Pay per call pays for a qualified inbound call
+        that lasts past a minimum duration, so payouts are smaller but a much larger share of
+        traffic qualifies. The two models can&rsquo;t be compared on payout alone.</div></details>
+      <details><summary>How often is the data updated?</summary>
+        <div class="ans">Coverage and payouts are pulled from LeadSmart&rsquo;s live feed once every
+        day and the site is rebuilt automatically. The exact date of the current dataset is shown at
+        the bottom of this page.</div></details>
+      <details><summary>Does a high payout mean it&rsquo;s a good market?</summary>
+        <div class="ans">No. Payout is only the revenue side. A market is worth entering when payout
+        times conversion rate exceeds your cost to acquire the traffic, which depends on search
+        volume, cost per click and how strong the existing local competition is. Several niches here
+        also pay a flat rate nationwide, so ranking their cities by payout tells you nothing at
+        all.</div></details>
+    </div>
+  </div>
+
+  <div class="ed-fine">
+    <p><b>Where the data comes from.</b> Coverage and payout figures come from LeadSmart&rsquo;s
+    public affiliate bid feed and are resynchronised daily. City, county, population and density are
+    matched from the SimpleMaps US Cities dataset (CC BY 4.0); roughly 13% of ZIP codes in the feed
+    are administrative or PO-box ZIPs with no matching city record, and those show no population
+    figure.</p>
+    <p><b>Fair warning.</b> Payouts shown are net payouts to the affiliate, before any traffic cost.
+    This site is an independent research tool and is not operated by or affiliated with
+    LeadSmart.</p>
+  </div>
+</section>
+
 <div class="foot" id="foot"></div>
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="data.js?v=2026-06-06-nichestates"></script>
+<script src="data.js?v=2026-07-27-nichesummary"></script>
 <script>
 const $=s=>document.querySelector(s);
 const fmt=n=>n==null?'—':Number(n).toLocaleString();
@@ -629,6 +1023,32 @@ async function loadZip(zip){const d=await j('/api/coverage_zip?zip='+encodeURICo
   if(d.error)return renderEmptyZip(zip,d.error);
   $('#q').value=d.city+', '+d.state;CURRENT=d;pushRecent(d.city,d.state);renderCity();}
 
+/* ---- landing leaderboard (shown until the user searches something) ---- */
+function hideLanding(){const e=$('#cityLanding');if(e)e.classList.add('hide');}
+async function renderLanding(){
+  const el=$('#cityLanding');if(!el||CURRENT)return;
+  const r=await j('/api/top_markets');
+  // Older databases predate the precomputed table — just skip the leaderboard.
+  if(!r||!r.markets||!r.markets.length)return;
+  const compact=n=>n==null?'—':n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':n>=1e3?Math.round(n/1e3)+'k':''+n;
+  el.innerHTML=`<div class="lead-head">
+      <h2>Top markets right now</h2>
+      <span class="sub">Ranked by stacked payout — every niche bought in that city, at its best payout
+        <span class="info" title="Sum of the highest payout for each niche available in the city. What one site covering all of them could earn per lead round.">i</span></span>
+    </div>
+    <div class="mkt-grid">${r.markets.map(m=>`
+      <div class="mkt" data-c="${m.city}" data-s="${m.state_id}"
+           title="See every niche and payout in ${m.city}, ${m.state_id}">
+        <div class="rk">${String(m.rank).padStart(2,'0')}</div>
+        <div class="cy">${m.city}, ${m.state_id}</div>
+        <div class="amt">${usd0(m.stacked)}<small>stacked</small></div>
+        <div class="meta">${m.niches} niches · ${compact(m.population)} people · ${fmt(m.zips)} ZIPs</div>
+      </div>`).join('')}</div>`;
+  el.classList.remove('hide');
+  el.querySelectorAll('.mkt').forEach(c=>c.onclick=()=>{
+    $('#q').value=c.dataset.c+', '+c.dataset.s;loadCity(c.dataset.c,c.dataset.s);});
+}
+
 function pushRecent(city,state){let r=LS.get('recent',[]);const k=city+'|'+state;
   r=r.filter(x=>x!==k);r.unshift(k);r=r.slice(0,6);LS.set('recent',r);renderRecent();}
 function renderRecent(){const r=LS.get('recent',[]);const el=$('#recent');
@@ -650,6 +1070,7 @@ function toggleSaved(city,state){let s=LS.get('saved',[]);const k=city+'|'+state
   LS.set('saved',s);return s.includes(k);}
 
 function renderCity(){
+  hideLanding();
   const d=CURRENT,niches=applySort(d.niches,SORT);
   const presets=[['score','Best fit'],['payout','Payout'],['population','Smallest market'],['zips','Most ZIPs']];
   const saved=isSaved(d.city,d.state);
@@ -731,11 +1152,11 @@ async function exportCityZips(d,niches){
       .map(v=>`"${(''+(v==null?'':v)).replace(/"/g,'""')}"`).join(',')));});
   dl(lines.join('\n'),`leadsmart_${d.city.replace(/\s+/g,'_')}_${d.state}_ZIPS.csv`);
   toast('Exported per-ZIP CSV');}
-function renderEmpty(city,state){CURRENT=null;
+function renderEmpty(city,state){CURRENT=null;hideLanding();
   $('#cityResult').innerHTML=`<div class="empty"><h3>“${city}${state?', '+state:''}” isn’t in LeadSmart’s network.</h3>
     <div class="lbl">Looking for covered cities nearby…</div><div class="near" id="near"></div></div>`;
   if(state)loadNearby(city,state);}
-function renderEmptyZip(zip,msg){CURRENT=null;
+function renderEmptyZip(zip,msg){CURRENT=null;hideLanding();
   $('#cityResult').innerHTML=`<div class="empty"><h3>ZIP ${zip}: ${msg}</h3>
     <div class="lbl">Try the city search to find the nearest covered market.</div></div>`;}
 async function loadNearby(city,state){
@@ -786,6 +1207,7 @@ function initNiche(){
     NICHE.view=b.dataset.view;
     document.querySelectorAll('#viewToggle button').forEach(x=>x.classList.toggle('on',x.dataset.view===NICHE.view));
     $('#tab-niche .niche-sidebar').classList.toggle('states-mode',NICHE.view==='states');
+    $('#nicheToolbar').classList.toggle('states-mode',NICHE.view==='states');
     NICHE.offset=0;loadNiche();});
   // Filter & advanced controls
   ['fState','fCity','fMinPay','fMaxPay','fMinPop','fMaxPop','fMinZip','fDensity'].forEach(id=>{
@@ -902,6 +1324,7 @@ function renderNicheStates(r){
     NICHE.view='cities';
     document.querySelectorAll('#viewToggle button').forEach(x=>x.classList.toggle('on',x.dataset.view==='cities'));
     $('#tab-niche .niche-sidebar').classList.remove('states-mode');
+    $('#nicheToolbar').classList.remove('states-mode');
     document.querySelectorAll('#presets .qv').forEach(p=>p.classList.remove('on'));
     ['fCity','fMinPay','fMaxPay','fMinPop','fMaxPop','fMinZip','fDensity'].forEach(id=>$('#'+id).value='');
     $('#fState').value=tr.dataset.s;NICHE.sort='payout';
@@ -1213,7 +1636,157 @@ function dl(text,name){const b=new Blob([text],{type:'text/csv'});const a=docume
   const src=META.source||'LeadSmart payouts';
   $('#foot').innerHTML=`Updated ${META.data_date} · ${fmt(META.total_cities)} cities · ${META.niches.length} niches · synced from ${src} · population & county from US Cities dataset`;
   renderRecent();
+  renderLanding();
+  refreshNicheRef();
 })();
+
+/* Refresh the static reference table from the live DB so the published figures
+   never drift from the data. The HTML ships with real numbers for crawlers and
+   for the pre-boot paint; this just corrects them once the DB is in memory. */
+async function refreshNicheRef(){
+  const tb=document.querySelector('#nicheRef tbody');if(!tb)return;
+  const r=await j('/api/niche_summary');if(!r||r.error||!r.niches)return;
+  const map={};r.niches.forEach(x=>{map[x.niche+'|'+x.payout_type]=x;});
+  const rows=[...tb.querySelectorAll('tr')];let updated=0;
+  rows.forEach(tr=>{
+    const d=map[tr.dataset.n+'|'+tr.dataset.t];if(!d)return;
+    const td=tr.querySelectorAll('td');
+    td[2].textContent=fmt(d.zips);
+    td[3].innerHTML=`<span class="pay">${usd(d.median)}</span>`;
+    td[4].textContent=d.min===d.max?'flat nationwide':`${usd(d.min)}–${usd(d.max)}`;
+    tr.dataset.median=d.median;updated++;
+  });
+  if(!updated)return;
+  // keep the table sorted highest-median-first as the copy above promises
+  rows.sort((a,b)=>(+b.dataset.median||0)-(+a.dataset.median||0)).forEach(tr=>tb.appendChild(tr));
+
+  // the three feature cards mirror the top of that same table
+  const label={};rows.forEach(tr=>{label[tr.dataset.n]=tr.querySelector('td').textContent.trim();});
+  const pods=document.querySelectorAll('#podium .pod');
+  r.niches.slice(0,pods.length).forEach((d,i)=>{
+    const p=pods[i];
+    p.querySelector('.rank').textContent=String(i+1).padStart(2,'0');
+    p.querySelector('.nm').textContent=label[d.niche]||d.niche;
+    p.querySelector('.amt').textContent=usd(d.median);
+    p.querySelector('.sub').textContent=
+      (d.min===d.max?'flat nationwide':`${usd(d.min)}–${usd(d.max)}`)+` · ${fmt(d.zips)} ZIPs`;
+    p.querySelector('.tag').textContent=d.payout_type==='CPL'?'Cost per lead':'Pay per call';
+  });
+
+  const note=$('#nicheRefNote');
+  if(note&&META&&META.data_date)note.textContent=`Live figures as of ${META.data_date}. Median = the middle ZIP code for that niche, not the highest.`;
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "@id": "https://leadsmart-coverage.netlify.app/#app",
+      "name": "LeadSmart Coverage Intelligence",
+      "url": "https://leadsmart-coverage.netlify.app/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Any (web browser)",
+      "browserRequirements": "Requires JavaScript and WebAssembly",
+      "description": "Look up what home-service leads pay in any US city or ZIP code. Live payouts and coverage for 20 niches across more than 41,000 ZIP codes, updated daily.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Lead payout lookup by city or ZIP code",
+        "Payout and coverage rankings by niche",
+        "State-level coverage and ZIP payout tiers",
+        "Multi-niche ZIP bundle finder",
+        "Profit-per-lead estimator",
+        "CSV export of ZIPs and payouts"
+      ]
+    },
+    {
+      "@type": "Dataset",
+      "@id": "https://leadsmart-coverage.netlify.app/#dataset",
+      "name": "US home-service lead payouts and ZIP code coverage",
+      "description": "Net affiliate payouts and ZIP-level buying coverage for 20 home-improvement and restoration lead niches across the United States, refreshed daily from LeadSmart's public bid feed and enriched with city, county and population data.",
+      "url": "https://leadsmart-coverage.netlify.app/",
+      "keywords": [
+        "lead generation",
+        "cost per lead",
+        "pay per call",
+        "home services",
+        "ZIP code coverage",
+        "affiliate payouts"
+      ],
+      "spatialCoverage": {
+        "@type": "Place",
+        "name": "United States"
+      },
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "isAccessibleForFree": true,
+      "creator": {
+        "@type": "Organization",
+        "name": "RankLocal",
+        "url": "https://ranklocal.cc"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://leadsmart-coverage.netlify.app/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How much do home-service leads pay?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "It depends heavily on the niche. In this network, restoration work pays most — biohazard cleanup, fire damage and water damage all sit near $190–$210 at the median and reach $500 in the strongest ZIP codes. Remodeling niches such as kitchens, siding and windows run roughly $100–$120. Trade call niches such as plumbing, HVAC and roofing typically pay $30–$45 per qualified call, and appliance repair is the cheapest at around $5.50."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which lead generation niche pays the most?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "By median payout, biohazard cleanup is the highest at about $210 per lead, followed by fire damage removal and water damage restoration. Water damage has the single highest payout of any ZIP code in the network at $507. These are all cost-per-lead niches, so payout is only earned on a booked appointment."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I check whether my city or ZIP code is covered?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Use the “By city” search at the top of this page. Enter a city name or a five-digit ZIP code and you’ll see every niche bought in that market with its payouts and ZIP counts. If a city isn’t covered, the tool automatically lists covered cities within 40 miles."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What’s the difference between CPL and pay per call?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Cost per lead pays when a submitted lead becomes a booked appointment, which is why those payouts are much larger. Pay per call pays for a qualified inbound call that lasts past a minimum duration, so payouts are smaller but a much larger share of traffic qualifies. The two models can’t be compared on payout alone."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How often is the data updated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Coverage and payouts are pulled from LeadSmart’s live feed once every day and the site is rebuilt automatically. The exact date of the current dataset is shown at the bottom of this page."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does a high payout mean it’s a good market?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Payout is only the revenue side. A market is worth entering when payout times conversion rate exceeds your cost to acquire the traffic, which depends on search volume, cost per click and how strong the existing local competition is. Several niches here also pay a flat rate nationwide, so ranking their cities by payout tells you nothing at all."
+          }
+        }
+      ]
+    }
+  ]
+}
 </script>
 </body>
 </html>

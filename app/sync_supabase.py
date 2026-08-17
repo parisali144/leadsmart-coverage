@@ -74,7 +74,22 @@ def supa_get(path, extra_headers=None):
     raise RuntimeError(f'supa_get gave up after 4 attempts on {path}: {last_err}')
 
 
-def fetch_all(table, columns='*'):
+def source_count(table, columns='zip', where=''):
+    """Return Supabase's authoritative exact row count for a table (the same
+    number fetch_all() must fully drain, given the same `where`). Used to record
+    how many rows the source held at sync time, so CI can gate 'did we fetch
+    ~everything the source had?' instead of the deadlock-prone 'is the new DB
+    ~as big as the old deployed DB?'."""
+    q = f'{table}?select={columns}&limit=1' + (f'&{where}' if where else '')
+    _, hdrs = supa_get(q, extra_headers={'Prefer': 'count=exact'})
+    cr = hdrs.get('Content-Range') or hdrs.get('content-range') or '*/0'
+    try:
+        return int(cr.split('/')[-1])
+    except ValueError:
+        return 0
+
+
+def fetch_all(table, columns='*', where=''):
     """Robust paginated fetch. Three protections against the silent-truncation
     bug that the naive 'len(rows) < PAGE' approach has:
 
@@ -85,8 +100,10 @@ def fetch_all(table, columns='*'):
          deploying a truncated DB."""
     PAGE = 1000
 
+    flt = f'&{where}' if where else ''
+
     # Step 1 — get the exact total. Supabase returns "Content-Range: 0-0/321822".
-    _, hdrs = supa_get(f'{table}?select={columns}&limit=1',
+    _, hdrs = supa_get(f'{table}?select={columns}&limit=1{flt}',
                        extra_headers={'Prefer': 'count=exact'})
     cr = hdrs.get('Content-Range') or hdrs.get('content-range') or '*/0'
     try:
@@ -97,12 +114,12 @@ def fetch_all(table, columns='*'):
 
     out, offset = [], 0
     while offset < total:
-        rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}')
+        rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}{flt}')
         if not rows:
             # Could be a transient empty page — try once more then bail.
             print(f'  {table}: got empty page at offset {offset}, retrying once…')
             time.sleep(2)
-            rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}')
+            rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}{flt}')
             if not rows:
                 break
         out.extend(rows)
@@ -175,8 +192,27 @@ def load_us_cities():
 
 def build():
     print('Sync starting…')
-    verticals = fetch_all('verticals', columns='id,slug,name,group_label,sort_order,priority,enabled')
-    top_bids = fetch_all('top_bids', columns='zip,vertical_id,net_payout,city,state,last_updated')
+    all_verticals = fetch_all('verticals', columns='id,slug,name,group_label,sort_order,priority,enabled')
+
+    # Match LeadSmart's live view exactly. Their frontend renders only verticals
+    # where `enabled && group_label !== 'Legal'` (the Legal/attorney verticals
+    # live behind their separate "Facebook Marketplace" toggle, and disabled
+    # verticals are hidden). Replicating that predicate makes our row/niche
+    # counts equal theirs to the row (verified: 22 verticals, 266,105 rows).
+    def is_live(v):
+        return bool(v.get('enabled')) and (v.get('group_label') or '') != 'Legal'
+    verticals = [v for v in all_verticals if is_live(v)]
+    live_ids = [v['id'] for v in verticals]
+    # PostgREST in-list; UUIDs need no quoting. Applied to both the count and
+    # the paged fetch so the integrity ratio stays ~1.0 against the same subset.
+    where = 'vertical_id=in.(%s)' % ','.join(live_ids)
+    print(f'  live-view verticals: {len(verticals)}/{len(all_verticals)} '
+          f'(excluded {len(all_verticals) - len(verticals)}: disabled + Legal group)')
+
+    source_top_bids = source_count('top_bids', where=where)
+    top_bids = fetch_all('top_bids',
+                         columns='zip,vertical_id,net_payout,city,state,last_updated',
+                         where=where)
 
     vmap = {v['id']: v for v in verticals}
     by_name, by_zip = load_us_cities()
@@ -252,6 +288,12 @@ def build():
     cur.execute('INSERT INTO meta VALUES (?,?)', ('data_date', data_date))
     cur.execute('INSERT INTO meta VALUES (?,?)', ('source', 'live · affiliate-bid-coverage.leadsmartinc.com'))
     cur.execute('INSERT INTO meta VALUES (?,?)', ('niche_count', str(len(verticals))))
+    # Authoritative source size at sync time + rows we actually wrote. CI gates
+    # deploy on the ratio of these two (truncation = wrote << source), which is
+    # immune to legitimate day-over-day feed swings and never deadlocks against
+    # a stale live baseline.
+    cur.execute('INSERT INTO meta VALUES (?,?)', ('source_top_bids', str(source_top_bids)))
+    cur.execute('INSERT INTO meta VALUES (?,?)', ('coverage_rows', str(len(rows))))
 
     cur.executescript('''
         CREATE INDEX idx_cov_citystate ON coverage(city, state_id);

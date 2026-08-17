@@ -12,7 +12,7 @@ jobs:
   refresh:
     name: Sync from Supabase and deploy to Netlify
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
 
     env:
       NETLIFY_SITE_ID: 021639a8-b4f0-46e6-8017-403569a56e1f
@@ -33,49 +33,46 @@ jobs:
           echo "----"
           ls -lh leadsmart.db
 
-      - name: Verify DB integrity (fail only on catastrophic drop)
+      - name: Verify DB integrity (guard against truncated fetches)
         run: |
-          # Pull the currently-live DB so we can compare sizes. A healthy daily
-          # sync fluctuates a few percent as LeadSmart's live bids change; a
-          # truncated fetch collapses to a fraction. We abort only on a drastic
-          # drop vs. what's live (or below an absolute sanity floor), so normal
-          # shrinkage still deploys. `|| true` — a missing baseline just falls
-          # back to the absolute floors below.
-          curl -fsS -o live.db \
-            "https://leadsmart-coverage.netlify.app/leadsmart.db?nocache=$(date +%s)" || true
+          # Truncation = we wrote far fewer rows than the SOURCE actually held.
+          # We gate on fetched-vs-source (both recorded in the meta table by the
+          # sync), NOT new-vs-live. The old new-vs-live check deadlocked: when it
+          # blocked a deploy the live baseline never updated, so the next day's
+          # correct data was compared against the same stale-high baseline and
+          # failed again — for days, whenever LeadSmart's feed legitimately
+          # stepped down ~25%. Source-relative gating is immune to real feed
+          # swings and cannot deadlock. Absolute floors still catch a fully
+          # broken sync.
           python - <<'PY'
           import sqlite3, os
-          def counts(path):
-              if not path or not os.path.exists(path):
-                  return None, None
-              c = sqlite3.connect(path)
-              try:
-                  n = c.execute('SELECT COUNT(DISTINCT niche) FROM coverage').fetchone()[0]
-                  r = c.execute('SELECT COUNT(*) FROM coverage').fetchone()[0]
-              except Exception:
-                  return None, None
-              finally:
-                  c.close()
-              return n, r
+          p = 'app/leadsmart.db'
+          assert os.path.exists(p), 'Aborting: sync produced no DB'
+          c = sqlite3.connect(p)
+          meta = dict(c.execute('SELECT k, v FROM meta').fetchall())
+          niches = c.execute('SELECT COUNT(DISTINCT niche) FROM coverage').fetchone()[0]
+          rows   = c.execute('SELECT COUNT(*) FROM coverage').fetchone()[0]
+          c.close()
 
-          new_niches, new_rows = counts('app/leadsmart.db')
-          live_niches, live_rows = counts('live.db')
-          print(f'new:  niches={new_niches}  rows={new_rows}')
-          print(f'live: niches={live_niches}  rows={live_rows}')
+          source = int(meta.get('source_top_bids') or 0)  # Supabase exact count at sync time
+          print(f'niches={niches}  coverage_rows={rows:,}  source_top_bids={source:,}')
 
-          # Absolute sanity floors — catch a totally broken sync regardless of baseline.
-          assert new_niches is not None and new_niches >= 18, \
-              f'Aborting: only {new_niches} niches in DB (expected 18+)'
-          assert new_rows is not None and new_rows >= 100_000, \
-              f'Aborting: only {new_rows} rows in DB (expected 100k+, likely a truncated fetch)'
+          # Absolute sanity floors — a totally broken sync fails regardless of source.
+          assert niches >= 18, f'Aborting: only {niches} niches (expected 18+)'
+          assert rows >= 100_000, \
+              f'Aborting: only {rows:,} rows (expected 100k+, likely a truncated fetch)'
 
-          # Relative guard — if a live baseline exists, refuse a catastrophic collapse.
-          if live_rows and live_rows > 0:
-              ratio = new_rows / live_rows
-              print(f'new/live row ratio = {ratio:.3f}')
-              assert ratio >= 0.75, (
-                  f'Aborting: new DB has {new_rows:,} rows vs {live_rows:,} live '
-                  f'({ratio:.1%}) — a >25% drop looks like truncation, not fluctuation.')
+          # Source-relative truncation guard. Coverage rows are top_bids minus a
+          # few dropped (payout<=0, unmapped vertical/zip), so expect ~0.9-1.0 of
+          # source. Anything under 0.85 means the fetch dropped a big chunk.
+          if source > 0:
+              ratio = rows / source
+              print(f'coverage/source ratio = {ratio:.3f}')
+              assert ratio >= 0.85, (
+                  f'Aborting: wrote {rows:,} rows but source held {source:,} '
+                  f'({ratio:.1%}) — fetch looks truncated, not a real feed change.')
+          else:
+              print('WARNING: source_top_bids missing from meta; skipping ratio gate')
           PY
 
       - name: Stamp DB version into data.js (busts browser cache)

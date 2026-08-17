@@ -2,6 +2,7 @@
 # Never commit the SQLite DB or the deploy package; they are reproduced fresh each run.
 app/leadsmart.db
 netlify-build/leadsmart.db
+netlify-build/api/
 deploy.zip
 deploy-resp.json
 dist/

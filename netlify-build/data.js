@@ -1,40 +1,51 @@
 /*
- * data.js — fully-static client-side data layer using sql.js.
+ * data.js — fully-static client-side data layer, JSON edition.
  *
- * Loads the SQLite database into the browser via sql.js (WebAssembly),
- * then services every /api/* URL the frontend used to hit on the Python
- * server. Same response shapes — so the existing index.html works unchanged.
+ * The tool used to download the whole 35 MB SQLite DB (sql.js) on first load.
+ * That's gone. The daily CI run (app/precompute.py) now bakes every possible
+ * query result into small static JSON under /api/, and this shim fetches only
+ * the handful of files a given interaction needs — a few KB to open the site,
+ * a few hundred KB at most for the heaviest drill-down.
  *
- * Exposes:
- *   window.dataReady — Promise that resolves when the DB is loaded
+ * The public contract is unchanged, so index.html works as-is:
+ *   window.dataReady — Promise that resolves once meta is loaded
  *   window.j(url)    — replacement for fetch(url).then(r=>r.json())
+ *
+ * Response shapes are byte-for-byte the same as the old sql.js layer; the
+ * aggregation-heavy endpoints are precomputed, and the row-level ones
+ * (coverage / zips / state_zips / suggest / nearby / compare / bundles filters)
+ * are recomputed here from small per-state shards and index files.
  */
 (function () {
-  // The DB filename never changes, but it's served with `immutable` for 1 year.
-  // We append a version suffix here so a bad/truncated previous DB doesn't keep
-  // serving from the user's browser cache. Bump this whenever the DB schema
-  // or full content materially changes (CI also does this automatically).
+  // CI stamps this on every deploy (see refresh.yml). It cache-busts every /api
+  // file at once, so a new deploy is picked up immediately while same-deploy
+  // repeat visits and drill-downs stay instant from the immutable cache.
   const DB_VERSION = '20260606-r2';
-  const DB_URL = 'leadsmart.db?v=' + DB_VERSION;
-  const SQL_JS_URL = 'https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/';
-  let DB = null;
+  const API = 'api/';
+  const v = (p) => API + p + '?v=' + DB_VERSION;
 
-  // ---------- helpers ----------
-  function num(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
-  function intnum(v) { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; }
-  function rows(stmt) {
-    const r = [];
-    while (stmt.step()) r.push(stmt.getAsObject());
-    stmt.free();
-    return r;
+  // ---------- fetch + cache ----------
+  const cache = new Map();        // path -> Promise<json>
+  function getJSON(path) {
+    let p = cache.get(path);
+    if (!p) {
+      p = fetch(v(path)).then(r => {
+        if (!r.ok) throw new Error(path + ' -> ' + r.status);
+        return r.json();
+      }).catch(e => { cache.delete(path); throw e; });
+      cache.set(path, p);
+    }
+    return p;
   }
-  // sql.js .bind() returns a boolean, not the statement. Wrap so we can
-  // still write `query(sql, params)` cleanly across all endpoints.
-  function query(sql, params) {
-    const stmt = DB.prepare(sql);
-    if (params && params.length) stmt.bind(params);
-    return rows(stmt);
+  // Optional file (missing 404 -> null instead of throwing).
+  function getJSONOpt(path) {
+    return getJSON(path).catch(() => null);
   }
+
+  // ---------- helpers (identical math to the old layer) ----------
+  function num(x) { const n = parseFloat(x); return Number.isFinite(n) ? n : null; }
+  function intnum(x) { const n = parseInt(x, 10); return Number.isFinite(n) ? n : null; }
+  function r2(x) { return x == null ? null : Math.round(x * 100) / 100; }
   function score(payout, zips, population) {
     if (!payout || !zips || !population || population <= 0) return 0;
     const pop = Math.max(population, 2500);
@@ -49,202 +60,98 @@
   function parseQS(u) {
     const i = u.indexOf('?'); const q = {};
     if (i < 0) return q;
-    new URLSearchParams(u.slice(i + 1)).forEach((v, k) => { q[k] = v; });
+    new URLSearchParams(u.slice(i + 1)).forEach((val, k) => { q[k] = val; });
     return q;
   }
-
-  // ---------- endpoint implementations ----------
-  const API = {
-    '/api/meta': () => {
-      const meta = {};
-      query('SELECT k,v FROM meta').forEach(r => { meta[r.k] = r.v; });
-      meta.total_cities = query(
-        'SELECT COUNT(DISTINCT city||"|"||state_id) AS c FROM coverage WHERE city IS NOT NULL AND state_id IS NOT NULL'
-      )[0].c;
-      meta.niches = query('SELECT DISTINCT niche FROM coverage ORDER BY niche').map(r => r.niche);
-      const nt = {};
-      query(`SELECT niche,payout_type,COUNT(DISTINCT zip) zips,
-                    COUNT(DISTINCT city||"|"||state_id) cities,MAX(payout) top_payout
-             FROM coverage GROUP BY niche,payout_type ORDER BY niche,payout_type`)
-        .forEach(r => {
-          (nt[r.niche] = nt[r.niche] || []).push({
-            payout_type: r.payout_type, zips: r.zips, cities: r.cities, top_payout: r.top_payout
-          });
-        });
-      meta.niche_types = nt;
-      return meta;
-    },
-
-    '/api/suggest': (q) => {
-      const s = (q.q || '').trim();
-      if (s.length < 2) return [];
-      // Rank so the big-city the user almost certainly means comes first:
-      //   1. Exact name match  (so "Phoenix" beats "Phoenixville")
-      //   2. Population        (so Phoenix AZ beats Phoenix MD)
-      //   3. ZIP coverage      (tiebreaker for unknown-pop entries)
-      //   4. Niche breadth     (final tiebreaker)
-      return query(`SELECT city, state_id,
-            COUNT(DISTINCT niche) AS niches,
-            COUNT(DISTINCT zip)   AS zips,
-            MAX(population)       AS population
-          FROM coverage
-          WHERE city IS NOT NULL AND state_id IS NOT NULL
-            AND city LIKE ? COLLATE NOCASE
-          GROUP BY city, state_id
-          ORDER BY
-            CASE WHEN LOWER(city)=LOWER(?) THEN 0 ELSE 1 END,
-            COALESCE(population,0) DESC,
-            zips DESC,
-            niches DESC
-          LIMIT 12`, [s + '%', s]);
-    },
-
-    '/api/coverage': (q) => coverageFor(q.city, q.state),
-    '/api/coverage_zip': (q) => {
-      const z = intnum(q.zip);
-      if (z == null) return { error: 'invalid zip' };
-      const r = query('SELECT DISTINCT city,state_id FROM coverage WHERE zip=? LIMIT 1', [z]);
-      if (!r.length) return { error: 'ZIP not covered for any niche', zip: z };
-      return coverageFor(r[0].city, r[0].state_id);
-    },
-
-    '/api/zips': (q) => {
-      const r = query(`SELECT zip,payout FROM coverage
-            WHERE city=? COLLATE NOCASE AND state_id=? COLLATE NOCASE
-              AND niche=? AND payout_type=?
-            ORDER BY payout DESC, zip ASC`,
-        [q.city || '', q.state || '', q.niche || '', q.ptype || 'CPL']);
-      const pays = r.map(x => x.payout);
-      return {
-        city: q.city, state: q.state, niche: q.niche, payout_type: q.ptype || 'CPL',
-        count: r.length, min: pays.length ? Math.min(...pays) : null,
-        max: pays.length ? Math.max(...pays) : null, zips: r
-      };
-    },
-
-    '/api/nearby': (q) => {
-      const anchor = query(`SELECT lat,lng FROM coverage
-          WHERE city=? COLLATE NOCASE AND state_id=? COLLATE NOCASE
-            AND lat IS NOT NULL AND lng IS NOT NULL LIMIT 1`,
-        [q.city || '', q.state || ''])[0];
-      if (!anchor) return [];
-      const radius = num(q.radius) || 25;
-      const cand = query(`SELECT city,state_id,AVG(lat) lat,AVG(lng) lng,
-              COUNT(DISTINCT niche) niches, COUNT(DISTINCT zip) zips
-            FROM coverage
-            WHERE lat IS NOT NULL AND lng IS NOT NULL
-              AND NOT (city=? COLLATE NOCASE AND state_id=? COLLATE NOCASE)
-            GROUP BY city,state_id`, [q.city || '', q.state || '']);
-      const out = [];
-      for (const r of cand) {
-        const d = haversine(anchor.lat, anchor.lng, r.lat, r.lng);
-        if (d <= radius) out.push({ city: r.city, state: r.state_id, distance: Math.round(d * 10) / 10, niches: r.niches, zips: r.zips });
-      }
-      out.sort((a, b) => a.distance - b.distance);
-      return out.slice(0, 10);
-    },
-
-    '/api/compare': (q) => {
-      const pairs = (q.targets || '').split(';').map(t => t.split('|')).filter(p => p.length === 2);
-      const data = {}, niches = new Set();
-      const list = [];
-      pairs.forEach(([c, s]) => {
-        const cov = coverageFor(c.trim(), s.trim());
-        const key = `${cov.city}, ${cov.state}`;
-        list.push(key);
-        data[key] = {};
-        cov.niches.forEach(n => {
-          const k = `${n.niche} (${n.payout_type})`;
-          niches.add(k);
-          data[key][k] = { payout: n.payout, zips: n.zips, score: n.score };
-        });
-        data[key]._meta = { population: cov.total_population, zips: cov.total_zips };
-      });
-      return { cities: list, niches: [...niches].sort(), data };
-    },
-
-    '/api/niche': (q) => nicheCities(q),
-    '/api/niche_states': (q) => nicheStates(q.niche || '', q.ptype || 'CPL'),
-    '/api/state': (q) => stateSummary(q.state || ''),
-    '/api/state_zips': (q) => stateNicheZips(q.state || '', q.niche || '', q.ptype || 'CPL', q.dir),
-    '/api/states': () => query(`SELECT state_id,
-            COUNT(DISTINCT niche) niches, COUNT(DISTINCT zip) zips,
-            COUNT(DISTINCT city||"|"||state_id) cities
-          FROM coverage WHERE state_id IS NOT NULL GROUP BY state_id ORDER BY state_id`),
-
-    '/api/bundles': (q) => bundles(q),
-
-    // Landing-page leaderboard. Precomputed by sync_supabase.py — ranking every
-    // city live needs a full scan, and sql.js is synchronous on the main thread,
-    // so doing it here would freeze the UI for ~2.5s on load. Degrades quietly
-    // if the DB predates the table (the UI just omits the leaderboard).
-    '/api/top_markets': () => {
-      const has = query(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='top_markets'");
-      if (!has.length) return { markets: [], unavailable: true };
-      return { markets: query('SELECT * FROM top_markets ORDER BY rank') };
-    },
-
-    // Per-niche payout summary for the reference table in the page copy.
-    // Median (not max) is the headline number — the top payout usually exists
-    // in a handful of ZIPs and overstates what a typical market is worth.
-    '/api/niche_summary': () => {
-      const base = query(`SELECT niche, payout_type,
-              COUNT(DISTINCT zip) AS zips,
-              MIN(payout) AS min, MAX(payout) AS max, AVG(payout) AS avg
-            FROM coverage GROUP BY niche, payout_type`);
-      const med = {};
-      query(`SELECT niche, payout_type, payout AS median FROM (
-              SELECT niche, payout_type, payout,
-                     ROW_NUMBER() OVER (PARTITION BY niche, payout_type ORDER BY payout) AS rn,
-                     COUNT(*)     OVER (PARTITION BY niche, payout_type) AS n
-              FROM coverage
-            ) WHERE rn = (n + 1) / 2`)
-        .forEach(r => { med[r.niche + '|' + r.payout_type] = r.median; });
-      base.forEach(r => {
-        r.median = med[r.niche + '|' + r.payout_type];
-        if (r.median == null) r.median = Math.round(r.avg * 100) / 100;
-        r.avg = Math.round(r.avg * 100) / 100;
-      });
-      base.sort((a, b) => b.median - a.median);
-      return { niches: base };
-    },
-  };
-
-  // ---------- by-city helpers ----------
-  function coverageFor(city, state) {
-    city = city || ''; state = state || '';
-    const niches = query(`SELECT niche,payout_type,
-          MAX(payout) payout, AVG(payout) avg_payout, MIN(payout) min_payout,
-          COUNT(DISTINCT zip) zips, MAX(population) population
-        FROM coverage
-        WHERE city=? COLLATE NOCASE AND state_id=? COLLATE NOCASE
-        GROUP BY niche,payout_type ORDER BY payout DESC`, [city, state])
-      .map(r => {
-        r.avg_payout = r.avg_payout ? Math.round(r.avg_payout * 100) / 100 : null;
-        r.score = score(r.payout, r.zips, r.population);
-        return r;
-      });
-    const tot = query(`SELECT COUNT(DISTINCT zip) zips, MAX(population) pop, MAX(county_name) county_name
-        FROM coverage WHERE city=? COLLATE NOCASE AND state_id=? COLLATE NOCASE`, [city, state])[0] || {};
-    const distinct = new Set(niches.map(n => n.niche)).size;
+  function slugify(name) {   // MUST match slugify() in precompute.py
+    return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  // Expand a {cols,rows} array-of-arrays table into row objects.
+  function expand(table) {
+    const cols = table.cols;
+    return table.rows.map(r => { const o = {}; for (let i = 0; i < cols.length; i++) o[cols[i]] = r[i]; return o; });
+  }
+  // Expand one row of a dictionary-encoded state shard.
+  function shardRow(shard, r) {
     return {
-      city, state, county: tot.county_name || null,
-      total_zips: tot.zips || 0, total_population: tot.pop || null,
-      niche_count: distinct, row_count: niches.length, niches,
-      bundles: findBundle(city, state)
+      city: r[0] < 0 ? null : shard.city[r[0]],
+      zip: r[1],
+      niche: r[2] < 0 ? null : shard.niche[r[2]],
+      payout_type: r[3] < 0 ? null : shard.ptype[r[3]],
+      payout: r[4],
+      population: r[5],
+      density: r[6],
+      lat: r[7],
+      lng: r[8],
+      county_name: r[9] < 0 ? null : shard.county[r[9]],
     };
   }
 
-  function findBundle(city, state) {
-    const r = query(`SELECT zip,niche,payout_type,payout FROM coverage
-        WHERE city=? COLLATE NOCASE AND state_id=? COLLATE NOCASE`, [city, state]);
+  // ---------- shard loaders ----------
+  function loadShard(state) { return getJSON('state/' + (state || '').toUpperCase() + '.json'); }
+  let CITIES = null;   // suggest/nearby index (lazy)
+  function loadCities() { return CITIES || (CITIES = getJSON('cities.json').then(expand)); }
+  let ZIPMAP = null;
+  function loadZipmap() { return ZIPMAP || (ZIPMAP = getJSON('zipmap.json')); }
+
+  // ---------- by-city (from a state shard) ----------
+  function rowsForCity(shard, city) {
+    const cl = (city || '').toLowerCase();
+    const out = [];
+    for (const raw of shard.rows) {
+      const c = raw[0] < 0 ? '' : shard.city[raw[0]];
+      if (c.toLowerCase() === cl) out.push(shardRow(shard, raw));
+    }
+    return out;
+  }
+
+  function coverageFromRows(city, state, rows) {
+    // GROUP BY niche,payout_type: MAX/AVG/MIN payout, COUNT DISTINCT zip, MAX pop
+    const g = new Map();
+    for (const r of rows) {
+      const k = r.niche + '|' + r.payout_type;
+      let a = g.get(k);
+      if (!a) { a = { niche: r.niche, payout_type: r.payout_type, max: -Infinity, sum: 0, n: 0, min: Infinity, zips: new Set(), pop: null }; g.set(k, a); }
+      a.max = Math.max(a.max, r.payout);
+      a.min = Math.min(a.min, r.payout);
+      a.sum += r.payout; a.n++;
+      a.zips.add(r.zip);
+      if (r.population != null && (a.pop == null || r.population > a.pop)) a.pop = r.population;
+    }
+    const niches = [...g.values()].map(a => {
+      const avg = a.n ? a.sum / a.n : null;
+      const o = {
+        niche: a.niche, payout_type: a.payout_type,
+        payout: a.max, avg_payout: avg ? r2(avg) : null, min_payout: a.min,
+        zips: a.zips.size, population: a.pop,
+      };
+      o.score = score(o.payout, o.zips, o.population);
+      return o;
+    }).sort((x, y) => y.payout - x.payout);
+
+    // totals
+    const allZ = new Set(); let pop = null, county = null;
+    for (const r of rows) {
+      allZ.add(r.zip);
+      if (r.population != null && (pop == null || r.population > pop)) pop = r.population;
+      if (r.county_name != null && (county == null || r.county_name > county)) county = r.county_name;
+    }
+    const distinct = new Set(niches.map(n => n.niche)).size;
+    return {
+      city, state, county: county || null,
+      total_zips: allZ.size, total_population: pop,
+      niche_count: distinct, row_count: niches.length, niches,
+      bundles: findBundle(rows),
+    };
+  }
+
+  function findBundle(rows) {
     const byZip = {};
-    r.forEach(x => {
+    for (const x of rows) {
       const z = x.zip; byZip[z] = byZip[z] || {};
-      const k = `${x.niche} (${x.payout_type})`;
+      const k = x.niche + ' (' + x.payout_type + ')';
       if (!byZip[z][k] || byZip[z][k] < x.payout) byZip[z][k] = x.payout;
-    });
+    }
     let best = null;
     for (const z in byZip) {
       const n = byZip[z]; const keys = Object.keys(n);
@@ -257,279 +164,243 @@
     return best;
   }
 
-  // ---------- by-niche ----------
-  const DENSITY_BANDS = { urban: [1000, 1e9], suburban: [200, 1000], rural: [0, 200] };
+  async function coverageFor(city, state) {
+    city = city || ''; state = (state || '').toUpperCase();
+    const shard = await loadShard(state);
+    return coverageFromRows(city, state, rowsForCity(shard, city));
+  }
 
-  function nicheCities(q) {
-    // City name search ("Find a city" box) is a "find by name" lookup, not
-    // a refinement filter. When the user types in it we bypass the numeric
-    // population / payout / ZIP / density filters so the city they typed
-    // actually appears — even if some active preset (e.g. Top picks with
-    // max_pop=50k) would otherwise hide it. State filter is kept because
-    // it's geographic, not size-based.
-    const cityQ = (q.q || '').trim();
-    const hasCityQ = cityQ.length > 0;
+  // ---------- endpoint handlers ----------
+  const HANDLERS = {
+    '/api/meta': () => getJSON('meta.json'),
+    '/api/states': () => getJSON('states.json'),
+    '/api/niche_summary': () => getJSON('niche_summary.json'),
+    '/api/top_markets': () => getJSON('top_markets.json'),
 
-    const where = ['niche=?', 'payout_type=?', 'city IS NOT NULL', 'state_id IS NOT NULL'];
-    const args = [q.niche || '', q.ptype || 'CPL'];
-    if (q.state) { where.push('state_id=?'); args.push(q.state.toUpperCase()); }
-    if (hasCityQ) {
-      // contains-match (was prefix), so "york" finds "New York" and "York"
-      where.push('city LIKE ? COLLATE NOCASE');
-      args.push('%' + cityQ + '%');
-    }
-    const sql = `SELECT city,state_id,
-                        MAX(payout) payout, AVG(payout) avg_payout, MIN(payout) min_payout,
-                        COUNT(DISTINCT zip) zips, MAX(population) population,
-                        MAX(density) density, MAX(county_name) county
-                 FROM coverage WHERE ${where.join(' AND ')} GROUP BY city,state_id`;
-    let all = query(sql, args);
+    '/api/suggest': async (q) => {
+      const s = (q.q || '').trim();
+      if (s.length < 2) return [];
+      const sl = s.toLowerCase();
+      const cities = await loadCities();
+      const hit = cities.filter(c => c.city && c.city.toLowerCase().startsWith(sl));
+      hit.sort((a, b) =>
+        (a.city.toLowerCase() === sl ? 0 : 1) - (b.city.toLowerCase() === sl ? 0 : 1) ||
+        (b.population || 0) - (a.population || 0) ||
+        b.zips - a.zips ||
+        b.niches - a.niches);
+      return hit.slice(0, 12).map(c => ({
+        city: c.city, state_id: c.state_id, niches: c.niches, zips: c.zips, population: c.population,
+      }));
+    },
 
-    const minPay = num(q.min_payout), maxPay = num(q.max_payout);
-    const minPop = intnum(q.min_pop), maxPop = intnum(q.max_pop);
-    const minZ = intnum(q.min_zips);
-    const dband = DENSITY_BANDS[(q.density || '').toLowerCase()];
-    const numericFiltersActive =
-      minPay != null || maxPay != null || minPop != null || maxPop != null || minZ != null || !!dband;
+    '/api/coverage': (q) => coverageFor(q.city, q.state),
 
-    const states = new Set();
-    let totalZips = 0;
+    '/api/coverage_zip': async (q) => {
+      const z = intnum(q.zip);
+      if (z == null) return { error: 'invalid zip' };
+      const zm = await loadZipmap();
+      const st = zm[String(z)];
+      if (!st) return { error: 'ZIP not covered for any niche', zip: z };
+      const shard = await loadShard(st);
+      let city = null;
+      for (const raw of shard.rows) { if (raw[1] === z) { city = raw[0] < 0 ? null : shard.city[raw[0]]; break; } }
+      if (city == null) return { error: 'ZIP not covered for any niche', zip: z };
+      return coverageFromRows(city, st, rowsForCity(shard, city));
+    },
 
-    const out = [];
-    for (const r of all) {
-      states.add(r.state_id);
-      // When city search is active, skip the numeric/density filters so the
-      // user finds the city by name regardless of which preset is applied.
-      if (!hasCityQ) {
-        if (minPay != null && r.payout < minPay) continue;
-        if (maxPay != null && r.payout > maxPay) continue;
-        if (maxPop != null && (r.population || 0) > maxPop) continue;
-        if (minPop != null && (r.population || 0) < minPop) continue;
-        if (minZ != null && r.zips < minZ) continue;
-        if (dband) { const d = r.density || 0; if (!(d >= dband[0] && d < dband[1])) continue; }
+    '/api/zips': async (q) => {
+      const shard = await loadShard(q.state);
+      const city = (q.city || '').toLowerCase(), niche = q.niche || '', ptype = q.ptype || 'CPL';
+      const r = [];
+      for (const raw of shard.rows) {
+        if ((raw[2] < 0 ? '' : shard.niche[raw[2]]) !== niche) continue;
+        if ((raw[3] < 0 ? '' : shard.ptype[raw[3]]) !== ptype) continue;
+        if ((raw[0] < 0 ? '' : shard.city[raw[0]]).toLowerCase() !== city) continue;
+        r.push({ zip: raw[1], payout: raw[4] });
       }
-      r.avg_payout = r.avg_payout ? Math.round(r.avg_payout * 100) / 100 : null;
-      r.density = r.density ? Math.round(r.density) : null;
-      r.score = score(r.payout, r.zips, r.population);
-      if (!r.population) r.population = null;
-      totalZips += r.zips;
-      out.push(r);
-    }
+      r.sort((a, b) => b.payout - a.payout || a.zip - b.zip);
+      const pays = r.map(x => x.payout);
+      return {
+        city: q.city, state: q.state, niche, payout_type: ptype,
+        count: r.length, min: pays.length ? Math.min(...pays) : null,
+        max: pays.length ? Math.max(...pays) : null, zips: r,
+      };
+    },
 
-    const sort = q.sort || 'score', dir = parseInt(q.dir || '-1', 10);
-    const keyf = {
-      payout: x => x.payout,
-      population: x => (x.population || 1e15),
-      zips: x => x.zips,
-      score: x => x.score,
-      city: x => x.city.toLowerCase()
-    }[sort] || (x => x.score);
-    if (sort === 'population') {
-      out.sort((a, b) => keyf(a) - keyf(b));
-      if (dir === 1) out.reverse();
-    } else if (sort === 'city') {
-      out.sort((a, b) => keyf(a) < keyf(b) ? -1 : keyf(a) > keyf(b) ? 1 : 0);
-      if (dir === 1) out.reverse();
-    } else {
-      out.sort((a, b) => keyf(b) - keyf(a));
-      if (dir === 1) out.reverse();
-    }
+    '/api/nearby': async (q) => {
+      const cities = await loadCities();
+      const cl = (q.city || '').toLowerCase(), sl = (q.state || '').toLowerCase();
+      const anchor = cities.find(c => c.city && c.city.toLowerCase() === cl &&
+        (c.state_id || '').toLowerCase() === sl && c.lat != null && c.lng != null);
+      if (!anchor) return [];
+      const radius = num(q.radius) || 25;
+      const out = [];
+      for (const r of cities) {
+        if (r.lat == null || r.lng == null) continue;
+        if (r.city && r.city.toLowerCase() === cl && (r.state_id || '').toLowerCase() === sl) continue;
+        const d = haversine(anchor.lat, anchor.lng, r.lat, r.lng);
+        if (d <= radius) out.push({ city: r.city, state: r.state_id, distance: Math.round(d * 10) / 10, niches: r.niches, zips: r.zips });
+      }
+      out.sort((a, b) => a.distance - b.distance);
+      return out.slice(0, 10);
+    },
 
-    const limit = intnum(q.limit) || 100, offset = intnum(q.offset) || 0;
-    return {
-      niche: q.niche || '', payout_type: q.ptype || 'CPL', total: out.length,
-      total_zips: totalZips, states: [...states].sort(),
-      cities: out.slice(offset, offset + limit), offset, limit,
-      filters_bypassed: hasCityQ && numericFiltersActive,
-    };
-  }
+    '/api/compare': async (q) => {
+      const pairs = (q.targets || '').split(';').map(t => t.split('|')).filter(p => p.length === 2);
+      const data = {}, niches = new Set(), list = [];
+      for (const [c, s] of pairs) {
+        const cov = await coverageFor(c.trim(), s.trim());
+        const key = `${cov.city}, ${cov.state}`;
+        list.push(key); data[key] = {};
+        cov.niches.forEach(n => {
+          const k = `${n.niche} (${n.payout_type})`;
+          niches.add(k);
+          data[key][k] = { payout: n.payout, zips: n.zips, score: n.score };
+        });
+        data[key]._meta = { population: cov.total_population, zips: cov.total_zips };
+      }
+      return { cities: list, niches: [...niches].sort(), data };
+    },
 
-  function nicheStates(niche, ptype) {
-    // Per-state rollup for ONE niche: cities covered, ZIPs, payout range,
-    // avg, population reached. Default sort = most ZIPs first (answers
-    // "which state has the most coverage for this niche").
-    const r = query(`SELECT state_id,
-            COUNT(DISTINCT city||'|'||state_id) AS cities,
-            COUNT(DISTINCT zip) AS zips,
-            MAX(payout) AS top_payout,
-            MIN(payout) AS low_payout,
-            AVG(payout) AS avg_payout
-          FROM coverage
-          WHERE niche=? AND payout_type=? AND state_id IS NOT NULL
-          GROUP BY state_id
-          ORDER BY zips DESC`, [niche, ptype]);
+    '/api/niche': async (q) => {
+      const niche = q.niche || '', ptype = q.ptype || 'CPL';
+      const file = await getJSONOpt('niche/' + slugify(niche) + '__' + ptype + '.json');
+      let all = file ? expand(file) : [];
 
-    // population reached per state (sum of distinct city populations)
-    const popRows = query(`SELECT state_id, SUM(pop) AS population FROM (
-            SELECT state_id, city, MAX(population) AS pop
-            FROM coverage
-            WHERE niche=? AND payout_type=? AND state_id IS NOT NULL
-            GROUP BY state_id, city
-          ) GROUP BY state_id`, [niche, ptype]);
-    const popMap = {};
-    popRows.forEach(p => { popMap[p.state_id] = p.population || 0; });
+      const cityQ = (q.q || '').trim(), hasCityQ = cityQ.length > 0;
+      const stateF = q.state ? q.state.toUpperCase() : null;
+      const cql = cityQ.toLowerCase();
 
-    let totalZips = 0, totalCities = 0;
-    r.forEach(x => {
-      x.avg_payout = x.avg_payout ? Math.round(x.avg_payout * 100) / 100 : null;
-      x.population = popMap[x.state_id] || 0;
-      totalZips += x.zips; totalCities += x.cities;
-    });
-    return { niche, payout_type: ptype, states: r,
-             state_count: r.length, total_zips: totalZips, total_cities: totalCities };
-  }
+      const minPay = num(q.min_payout), maxPay = num(q.max_payout);
+      const minPop = intnum(q.min_pop), maxPop = intnum(q.max_pop);
+      const minZ = intnum(q.min_zips);
+      const DENSITY_BANDS = { urban: [1000, 1e9], suburban: [200, 1000], rural: [0, 200] };
+      const dband = DENSITY_BANDS[(q.density || '').toLowerCase()];
+      const numericFiltersActive =
+        minPay != null || maxPay != null || minPop != null || maxPop != null || minZ != null || !!dband;
 
-  function stateSummary(state) {
-    state = (state || '').toUpperCase();
-    // Per niche/type in this state: ZIP count, distinct cities, payout range
-    // (lowest → highest), average, and population reached.
-    const r = query(`SELECT niche, payout_type,
-            COUNT(DISTINCT city||'|'||state_id) AS cities,
-            COUNT(DISTINCT zip) AS zips,
-            MAX(payout) AS top_payout,
-            MIN(payout) AS low_payout,
-            AVG(payout) AS avg_payout
-          FROM coverage WHERE state_id=?
-          GROUP BY niche, payout_type
-          ORDER BY top_payout DESC`, [state]);
+      const states = new Set();
+      let totalZips = 0;
+      const out = [];
+      for (const r of all) {
+        if (r.city == null || r.state_id == null) continue;
+        if (stateF && r.state_id !== stateF) continue;
+        if (hasCityQ && !(r.city.toLowerCase().includes(cql))) continue;
+        states.add(r.state_id);
+        if (!hasCityQ) {
+          if (minPay != null && r.payout < minPay) continue;
+          if (maxPay != null && r.payout > maxPay) continue;
+          if (maxPop != null && (r.population || 0) > maxPop) continue;
+          if (minPop != null && (r.population || 0) < minPop) continue;
+          if (minZ != null && r.zips < minZ) continue;
+          if (dband) { const d = r.density || 0; if (!(d >= dband[0] && d < dband[1])) continue; }
+        }
+        const o = {
+          city: r.city, state_id: r.state_id, payout: r.payout,
+          avg_payout: r.avg_payout ? Math.round(r.avg_payout * 100) / 100 : null,
+          min_payout: r.min_payout, zips: r.zips,
+          population: r.population || null,
+          density: r.density ? Math.round(r.density) : null,
+          county: r.county,
+        };
+        o.score = score(o.payout, o.zips, o.population);
+        totalZips += o.zips;
+        out.push(o);
+      }
 
-    // population reached per niche (distinct city populations summed)
-    const popRows = query(`SELECT niche, payout_type, SUM(pop) AS population FROM (
-            SELECT niche, payout_type, city, state_id, MAX(population) AS pop
-            FROM coverage WHERE state_id=?
-            GROUP BY niche, payout_type, city, state_id
-          ) GROUP BY niche, payout_type`, [state]);
-    const popMap = {};
-    popRows.forEach(p => { popMap[p.niche + '|' + p.payout_type] = p.population || 0; });
+      const sort = q.sort || 'score', dir = parseInt(q.dir || '-1', 10);
+      const keyf = {
+        payout: x => x.payout, population: x => (x.population || 1e15),
+        zips: x => x.zips, score: x => x.score, city: x => x.city.toLowerCase(),
+      }[sort] || (x => x.score);
+      if (sort === 'population') { out.sort((a, b) => keyf(a) - keyf(b)); if (dir === 1) out.reverse(); }
+      else if (sort === 'city') { out.sort((a, b) => keyf(a) < keyf(b) ? -1 : keyf(a) > keyf(b) ? 1 : 0); if (dir === 1) out.reverse(); }
+      else { out.sort((a, b) => keyf(b) - keyf(a)); if (dir === 1) out.reverse(); }
 
-    r.forEach(x => {
-      x.avg_payout = x.avg_payout ? Math.round(x.avg_payout * 100) / 100 : null;
-      x.population = popMap[x.niche + '|' + x.payout_type] || 0;
-    });
-    return { state, count: r.length, niches: r };
-  }
+      const limit = intnum(q.limit) || 100, offset = intnum(q.offset) || 0;
+      return {
+        niche, payout_type: ptype, total: out.length, total_zips: totalZips,
+        states: [...states].sort(), cities: out.slice(offset, offset + limit),
+        offset, limit, filters_bypassed: hasCityQ && numericFiltersActive,
+      };
+    },
 
-  function stateNicheZips(state, niche, ptype, sortDir) {
-    // Every ZIP for one niche+type across the whole state, with its city and
-    // payout. Sorted by payout (default lowest→highest so people see the floor
-    // first), plus a payout-tier distribution and top-city rollup.
-    state = (state || '').toUpperCase();
-    const dir = sortDir === 'desc' ? 'DESC' : 'ASC';
-    const rows = query(`SELECT zip, city, payout, population, county_name AS county
-          FROM coverage
-          WHERE state_id=? AND niche=? AND payout_type=?
-          ORDER BY payout ${dir}, zip ASC`, [state, niche, ptype]);
+    '/api/niche_states': (q) =>
+      getJSONOpt('niche_states/' + slugify(q.niche || '') + '__' + (q.ptype || 'CPL') + '.json')
+        .then(r => r || { niche: q.niche || '', payout_type: q.ptype || 'CPL', states: [], state_count: 0, total_zips: 0, total_cities: 0 }),
 
-    // payout-tier distribution (how many ZIPs at each distinct payout)
-    const tierMap = {};
-    rows.forEach(x => { tierMap[x.payout] = (tierMap[x.payout] || 0) + 1; });
-    const tiers = Object.keys(tierMap)
-      .map(p => ({ payout: +p, zips: tierMap[p] }))
-      .sort((a, b) => b.payout - a.payout);
+    '/api/state': (q) =>
+      getJSONOpt('state_summary/' + (q.state || '').toUpperCase() + '.json')
+        .then(r => r || { state: (q.state || '').toUpperCase(), count: 0, niches: [] }),
 
-    // top cities by best payout in this state for this niche
-    const cityMap = {};
-    rows.forEach(x => {
-      if (!x.city) return;
-      const c = cityMap[x.city] = cityMap[x.city] || { city: x.city, zips: 0, max: 0, min: Infinity, population: x.population };
-      c.zips++; if (x.payout > c.max) c.max = x.payout; if (x.payout < c.min) c.min = x.payout;
-    });
-    const cities = Object.values(cityMap).sort((a, b) => b.max - a.max || b.zips - a.zips);
+    '/api/state_zips': async (q) => {
+      const state = (q.state || '').toUpperCase(), niche = q.niche || '', ptype = q.ptype || 'CPL';
+      const shard = await loadShard(state);
+      const rows = [];
+      for (const raw of shard.rows) {
+        if ((raw[2] < 0 ? '' : shard.niche[raw[2]]) !== niche) continue;
+        if ((raw[3] < 0 ? '' : shard.ptype[raw[3]]) !== ptype) continue;
+        rows.push({ zip: raw[1], city: raw[0] < 0 ? null : shard.city[raw[0]], payout: raw[4], population: raw[5], county: raw[9] < 0 ? null : shard.county[raw[9]] });
+      }
+      const desc = q.dir === 'desc';
+      rows.sort((a, b) => (desc ? b.payout - a.payout : a.payout - b.payout) || a.zip - b.zip);
 
-    const pays = rows.map(x => x.payout);
-    return {
-      state, niche, payout_type: ptype, count: rows.length,
-      min: pays.length ? Math.min(...pays) : null,
-      max: pays.length ? Math.max(...pays) : null,
-      avg: pays.length ? Math.round(pays.reduce((a, b) => a + b, 0) / pays.length * 100) / 100 : null,
-      tiers, cities, zips: rows,
-    };
-  }
+      const tierMap = {};
+      rows.forEach(x => { tierMap[x.payout] = (tierMap[x.payout] || 0) + 1; });
+      const tiers = Object.keys(tierMap).map(p => ({ payout: +p, zips: tierMap[p] })).sort((a, b) => b.payout - a.payout);
 
-  function bundles(q) {
-    const state = q.state || '', minNiches = intnum(q.min_niches) || 2;
-    const where = ['city IS NOT NULL', 'state_id IS NOT NULL'];
-    const args = [];
-    if (state) { where.push('state_id=?'); args.push(state.toUpperCase()); }
-    const r = query(`SELECT city,state_id,zip,niche,payout_type,
-            MAX(payout) payout, MAX(population) population, MAX(county_name) county
-          FROM coverage WHERE ${where.join(' AND ')}
-          GROUP BY city,state_id,zip,niche,payout_type`, args);
-    const byZip = {};
-    r.forEach(x => {
-      const k = x.city + '|' + x.state_id + '|' + x.zip;
-      const d = byZip[k] = byZip[k] || { pop: x.population, county: x.county, n: {} };
-      if (!d.n[x.niche] || d.n[x.niche].payout < x.payout) d.n[x.niche] = { payout: x.payout, ptype: x.payout_type };
-    });
-    const byCity = {};
-    for (const k in byZip) {
-      const [city, st, zip] = k.split('|');
-      const d = byZip[k]; const nk = Object.keys(d.n);
-      if (nk.length < minNiches) continue;
-      const top = nk.sort((a, b) => d.n[b].payout - d.n[a].payout).slice(0, 4);
-      const combined = Math.round(top.reduce((s, n) => s + d.n[n].payout, 0) * 100) / 100;
-      const cand = { city, state_id: st, zip: +zip, population: d.pop, county: d.county,
-                     niche_count: nk.length, combined,
-                     stack: top.map(n => ({ niche: n, payout: d.n[n].payout, ptype: d.n[n].ptype })) };
-      const ck = city + '|' + st;
-      if (!byCity[ck] || byCity[ck].combined < combined) byCity[ck] = cand;
-    }
-    let out = Object.values(byCity);
-    const minPop = intnum(q.min_pop);
-    if (minPop != null) out = out.filter(c => (c.population || 0) >= minPop);
-    const sort = q.sort || 'combined';
-    const keyf = { combined: x => x.combined, niches: x => x.niche_count,
-                   population: x => (x.population || 1e15) }[sort] || (x => x.combined);
-    if (sort === 'population') out.sort((a, b) => keyf(a) - keyf(b));
-    else out.sort((a, b) => keyf(b) - keyf(a));
-    const limit = intnum(q.limit) || 50, offset = intnum(q.offset) || 0;
-    return { total: out.length, items: out.slice(offset, offset + limit), offset, limit };
-  }
+      const cityMap = {};
+      rows.forEach(x => {
+        if (!x.city) return;
+        const c = cityMap[x.city] = cityMap[x.city] || { city: x.city, zips: 0, max: 0, min: Infinity, population: x.population };
+        c.zips++; if (x.payout > c.max) c.max = x.payout; if (x.payout < c.min) c.min = x.payout;
+      });
+      const cities = Object.values(cityMap).sort((a, b) => b.max - a.max || b.zips - a.zips);
 
-  // ---------- public API ----------
+      const pays = rows.map(x => x.payout);
+      return {
+        state, niche, payout_type: ptype, count: rows.length,
+        min: pays.length ? Math.min(...pays) : null,
+        max: pays.length ? Math.max(...pays) : null,
+        avg: pays.length ? Math.round(pays.reduce((a, b) => a + b, 0) / pays.length * 100) / 100 : null,
+        tiers, cities, zips: rows,
+      };
+    },
+
+    '/api/bundles': async (q) => {
+      const state = q.state ? q.state.toUpperCase() : '_all';
+      let mn = intnum(q.min_niches) || 2;
+      if (mn < 2) mn = 2; if (mn > 6) mn = 6;   // precomputed set is 2..6
+      const file = await getJSONOpt('bundles/' + state + '__' + mn + '.json');
+      let out = (file && file.items) ? file.items.slice() : [];
+      const minPop = intnum(q.min_pop);
+      if (minPop != null) out = out.filter(c => (c.population || 0) >= minPop);
+      const sort = q.sort || 'combined';
+      const keyf = { combined: x => x.combined, niches: x => x.niche_count, population: x => (x.population || 1e15) }[sort] || (x => x.combined);
+      if (sort === 'population') out.sort((a, b) => keyf(a) - keyf(b));
+      else out.sort((a, b) => keyf(b) - keyf(a));
+      const limit = intnum(q.limit) || 50, offset = intnum(q.offset) || 0;
+      return { total: out.length, items: out.slice(offset, offset + limit), offset, limit };
+    },
+  };
+
+  // ---------- boot ----------
   window.dataReady = (async () => {
-    // Load sql.js then the database
-    const initSqlJs = await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = SQL_JS_URL + 'sql-wasm.js';
-      s.onload = () => resolve(window.initSqlJs);
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-    const SQL = await initSqlJs({ locateFile: f => SQL_JS_URL + f });
+    // The landing page only needs meta; fetch it, then dismiss the boot overlay.
+    // Everything else streams in on demand as the user navigates.
+    try { await getJSON('meta.json'); } catch (e) { /* j() will surface errors */ }
     const bar = document.getElementById('boot-bar');
-    const pct = document.getElementById('boot-pct');
-
-    const res = await fetch(DB_URL);
-    if (!res.ok) throw new Error('failed to load database');
-    const total = +res.headers.get('Content-Length') || 41000000;
-    const reader = res.body.getReader();
-    const chunks = []; let received = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value); received += value.length;
-      if (bar) bar.style.width = Math.min(99, Math.round(100 * received / total)) + '%';
-      if (pct) pct.textContent = Math.round(received / 1024 / 1024) + ' MB';
-    }
-    const buf = new Uint8Array(received); let off = 0;
-    for (const c of chunks) { buf.set(c, off); off += c.length; }
-    DB = new SQL.Database(buf);
     if (bar) bar.style.width = '100%';
     const boot = document.getElementById('boot');
-    if (boot) setTimeout(() => { boot.style.opacity = '0'; setTimeout(() => boot.remove(), 350); }, 200);
+    if (boot) setTimeout(() => { boot.style.opacity = '0'; setTimeout(() => boot.remove(), 350); }, 120);
   })();
 
-  // Replace fetch().then(json) shim used by index.html
   window.j = async function (url) {
     await window.dataReady;
     const path = url.split('?')[0];
-    const handler = API[path];
+    const handler = HANDLERS[path];
     if (!handler) return { error: 'unknown endpoint: ' + path };
-    try {
-      return handler(parseQS(url));
-    } catch (e) {
-      return { error: e.message };
-    }
+    try { return await handler(parseQS(url)); }
+    catch (e) { return { error: e.message }; }
   };
 })();

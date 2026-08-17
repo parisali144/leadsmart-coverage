@@ -75,11 +75,22 @@ jobs:
               print('WARNING: source_top_bids missing from meta; skipping ratio gate')
           PY
 
+      - name: Precompute static JSON API
+        run: |
+          # Turn the 35 MB DB into a tree of small static JSON files so the
+          # browser never downloads the DB. Visitors fetch only the few files an
+          # interaction needs (KB to open the site, a few hundred KB at most).
+          rm -rf netlify-build/api
+          python app/precompute.py app/leadsmart.db netlify-build/api
+          echo "----"
+          echo "api files: $(find netlify-build/api -name '*.json' | wc -l)"
+          du -sh netlify-build/api
+
       - name: Stamp DB version into data.js (busts browser cache)
         run: |
-          # The data.js shim appends ?v=DB_VERSION to its DB fetch URL. Updating
-          # the constant on every build guarantees no user is ever stuck with a
-          # stale cached copy from a previous deploy.
+          # data.js appends ?v=DB_VERSION to every /api fetch. Bumping the constant
+          # each build busts all API files at once, so no user is ever stuck with a
+          # stale cached copy while same-deploy repeat visits stay instant.
           STAMP="$(date -u +%Y%m%d-%H%M%S)"
           sed -i "s/const DB_VERSION = '[^']*';/const DB_VERSION = '${STAMP}';/" netlify-build/data.js
           # Same for the index.html script tag, so browsers refetch the new data.js too.
@@ -96,7 +107,7 @@ jobs:
           cp netlify-build/favicon.svg     dist/
           cp netlify-build/robots.txt      dist/
           cp netlify-build/sitemap.xml     dist/
-          cp app/leadsmart.db              dist/
+          cp -r netlify-build/api          dist/
           cd dist
           zip -r9 ../deploy.zip .
           cd ..
@@ -120,4 +131,9 @@ jobs:
       - name: Verify the live site responds 200
         run: |
           sleep 25
-          curl -sSf -o /dev/null -w "homepage: %%{http_code}\n" "https://leadsmart-coverage.netlify.app/"
+          base="https://leadsmart-coverage.netlify.app"
+          curl -sSf -o /dev/null -w "homepage:  %%{http_code}\n" "$base/"
+          # The API is now what powers the tool — confirm a core file is live and
+          # is real JSON, so a broken precompute/deploy fails loudly.
+          curl -sSf -o meta.json -w "meta.json:  %%{http_code}\n" "$base/api/meta.json"
+          python -c "import json;d=json.load(open('meta.json'));print('niches:',len(d['niches']),'cities:',d['total_cities'])"

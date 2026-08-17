@@ -1,20 +1,19 @@
 [build]
   publish = "."
 
-# Aggressive cache for the database — it only changes when we rebuild.
-# Browsers will keep the 38MB DB for repeat visits, so only the first load is slow.
+# The precomputed JSON API. Every file is fetched with ?v=<deploy-stamp>, so a
+# new deploy busts them all at once and same-deploy repeat visits/drill-downs are
+# instant from cache. Safe to mark immutable because the URL changes on change.
 [[headers]]
-  for = "/leadsmart.db"
+  for = "/api/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
-    Content-Type = "application/vnd.sqlite3"
 
+# data.js carries the deploy stamp that versions every /api fetch, so it must
+# always be revalidated — one tiny roundtrip per visit.
 [[headers]]
   for = "/data.js"
   [headers.values]
-    # Always revalidate; the DB file below is immutable so this is the only
-    # asset that can change in a deploy. Pay one ~16 KB roundtrip per visit
-    # so users always run the current sql.js shim.
     Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]

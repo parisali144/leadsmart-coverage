@@ -180,10 +180,20 @@
   .rl-eyebrow{font-size:10.5px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;opacity:.78}
   .rl-main{font-size:13.5px;font-weight:680;letter-spacing:-.005em}
   .rl-arrow{font-size:17px;line-height:1;margin-left:2px}
+
+  .rl-actions{display:flex;align-items:center;gap:10px}
+  .join-cta{display:inline-flex;align-items:center;gap:8px;
+          background:transparent;color:var(--acc);text-decoration:none;
+          padding:9px 16px;border-radius:12px;border:1.5px solid var(--acc-line);
+          font-size:13.5px;font-weight:680;letter-spacing:-.005em;
+          transition:background .15s,transform .08s,border-color .15s}
+  .join-cta:hover{background:var(--acc-soft);border-color:var(--acc)}
+  .join-cta:active{transform:translateY(1px)}
   @media(max-width:560px){
     .tabs-row{gap:10px}
     .rl-eyebrow{display:none}
     .rl-main{font-size:12.5px}
+    .join-cta{padding:9px 12px;font-size:12.5px}
     /* Five tabs are wider than a phone viewport. Scroll the bar itself instead
        of letting it push the whole page sideways. */
     .maintabs{max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
@@ -583,15 +593,21 @@
     <button data-tab="bundles">Bundles</button>
     <button data-tab="saved">Saved</button>
   </div>
-  <a class="rl-cta" href="https://ranklocal.cc" target="_blank" rel="noopener"
-     title="Open RankLocal in a new tab to build a lead-gen site for this niche">
-    <span class="rl-spark">✦</span>
-    <span class="rl-text">
-      <span class="rl-eyebrow">Next step</span>
-      <span class="rl-main">Build a site in RankLocal</span>
-    </span>
-    <span class="rl-arrow">→</span>
-  </a>
+  <div class="rl-actions">
+    <a class="join-cta" href="https://leadsmartinc.com/affiliate-register-rank-and-rent-with-paris/" target="_blank" rel="noopener"
+       title="Join LeadSmart as an affiliate">
+      Join LeadSmart
+    </a>
+    <a class="rl-cta" href="https://ranklocal.cc" target="_blank" rel="noopener"
+       title="Open RankLocal in a new tab to build a lead-gen site for this niche">
+      <span class="rl-spark">✦</span>
+      <span class="rl-text">
+        <span class="rl-eyebrow">Next step</span>
+        <span class="rl-main">Build a site in RankLocal</span>
+      </span>
+      <span class="rl-arrow">→</span>
+    </a>
+  </div>
 </div>
 
 <!-- ============ BY CITY ============ -->

@@ -66,6 +66,17 @@
   function slugify(name) {   // MUST match slugify() in precompute.py
     return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
+  // Normalize a city name for search matching only (never for display or lookup).
+  // Folds the abbreviation spellings LeadSmart's feed mixes (St.↔Saint, Ft↔Fort,
+  // Mt↔Mount) and strips punctuation/apostrophes so "OFallon"/"O Fallon" match
+  // "O'Fallon". Mirrors norm_city() in sync_supabase.py, minus the trailing-space
+  // anchors (we compare word-by-word here, not against a fixed key).
+  function normCity(name) {
+    let s = (name || '').toLowerCase().replace(/[^a-z0-9\s]+/g, ' ');
+    s = s.replace(/\s+/g, ' ').trim();
+    s = s.replace(/^st /, 'saint ').replace(/^ft /, 'fort ').replace(/^mt /, 'mount ');
+    return s;
+  }
   // Expand a {cols,rows} array-of-arrays table into row objects.
   function expand(table) {
     const cols = table.cols;
@@ -182,13 +193,31 @@
       if (s.length < 2) return [];
       const sl = s.toLowerCase();
       const cities = await loadCities();
-      const hit = cities.filter(c => c.city && c.city.toLowerCase().startsWith(sl));
+      const nq = normCity(s);
+      // Rank by match quality: exact (0) > prefix (1) > word-boundary (2) >
+      // anywhere (3). This surfaces cities LeadSmart covers that a literal
+      // startsWith would hide — spelling variants (St.↔Saint) and mid-name
+      // typing ("Fallon" → "O'Fallon").
+      const nqc = nq.replace(/ /g, '');   // space-insensitive form ("ofallon")
+      const hit = [];
+      for (const c of cities) {
+        if (!c.city) continue;
+        const nc = normCity(c.city);
+        let tier;
+        if (nc === nq) tier = 0;
+        else if (nc.startsWith(nq)) tier = 1;
+        else if (nc.includes(' ' + nq)) tier = 2;
+        else if (nc.includes(nq)) tier = 3;
+        else if (nc.replace(/ /g, '').includes(nqc)) tier = 4;  // "OFallon"→"O'Fallon"
+        else continue;
+        hit.push([tier, c]);
+      }
       hit.sort((a, b) =>
-        (a.city.toLowerCase() === sl ? 0 : 1) - (b.city.toLowerCase() === sl ? 0 : 1) ||
-        (b.population || 0) - (a.population || 0) ||
-        b.zips - a.zips ||
-        b.niches - a.niches);
-      return hit.slice(0, 12).map(c => ({
+        a[0] - b[0] ||
+        (b[1].population || 0) - (a[1].population || 0) ||
+        b[1].zips - a[1].zips ||
+        b[1].niches - a[1].niches);
+      return hit.slice(0, 12).map(([, c]) => ({
         city: c.city, state_id: c.state_id, niches: c.niches, zips: c.zips, population: c.population,
       }));
     },

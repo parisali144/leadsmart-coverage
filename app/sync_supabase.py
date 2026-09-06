@@ -89,18 +89,32 @@ def source_count(table, columns='zip', where=''):
         return 0
 
 
-def fetch_all(table, columns='*', where=''):
-    """Robust paginated fetch. Three protections against the silent-truncation
+def fetch_all(table, columns='*', where='', order=None):
+    """Robust paginated fetch. Four protections against the silent-truncation
     bug that the naive 'len(rows) < PAGE' approach has:
 
       1. Get the exact total count first via Prefer: count=exact + Content-Range.
-      2. Loop using offset accumulated by actual rows received, until we hit
+      2. Page under an explicit, stable ORDER BY (`order`). Without it PostgREST
+         imposes no ordering, so Postgres is free to return a different row order
+         per request (parallel seq scans do exactly this). `offset=N` then skips
+         N *arbitrary* rows, so pages overlap and other rows are never seen —
+         you reach the exact `total` yet whole low-volume verticals are missing
+         (observed: a sync that fetched the full row count but only 17 of 23
+         niches, silently dropping Solar/Landscaping/Deck). A unique key order
+         (e.g. zip,vertical_id) makes `offset=N` mean the same N rows every time.
+      3. Loop using offset accumulated by actual rows received, until we hit
          that known total — never trust 'short page = last page'.
-      3. If we still come up short after the loop, raise instead of silently
-         deploying a truncated DB."""
+      4. If we still come up short after the loop, raise instead of silently
+         deploying a truncated DB.
+
+    Belt-and-suspenders: rows are de-duplicated on `order`'s key so that if the
+    source is mutated mid-fetch (LeadSmart's daily batch overlaps our window) a
+    shifted page cannot inflate the count with duplicates while masking a gap."""
     PAGE = 1000
 
     flt = f'&{where}' if where else ''
+    ordq = f'&order={order}' if order else ''
+    key_cols = [c.split('.')[0] for c in order.split(',')] if order else None
 
     # Step 1 — get the exact total. Supabase returns "Content-Range: 0-0/321822".
     _, hdrs = supa_get(f'{table}?select={columns}&limit=1{flt}',
@@ -112,17 +126,23 @@ def fetch_all(table, columns='*', where=''):
         total = 0
     print(f'  {table}: total expected = {total:,}')
 
-    out, offset = [], 0
+    out, offset, seen = [], 0, set()
     while offset < total:
-        rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}{flt}')
+        rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}{flt}{ordq}')
         if not rows:
             # Could be a transient empty page — try once more then bail.
             print(f'  {table}: got empty page at offset {offset}, retrying once…')
             time.sleep(2)
-            rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}{flt}')
+            rows, _ = supa_get(f'{table}?select={columns}&offset={offset}&limit={PAGE}{flt}{ordq}')
             if not rows:
                 break
-        out.extend(rows)
+        for r in rows:
+            if key_cols:
+                k = tuple(r.get(c) for c in key_cols)
+                if k in seen:
+                    continue
+                seen.add(k)
+            out.append(r)
         offset += len(rows)
         print(f'  {table}: fetched {len(out):,}/{total:,} rows', end='\r')
 
@@ -210,9 +230,12 @@ def build():
           f'(excluded {len(all_verticals) - len(verticals)}: disabled + Legal group)')
 
     source_top_bids = source_count('top_bids', where=where)
+    # (zip, vertical_id) is unique per row (one top bid per ZIP per vertical), so
+    # it is a total, stable order — the guarantee offset pagination needs to not
+    # silently drop rows. See fetch_all's docstring.
     top_bids = fetch_all('top_bids',
                          columns='zip,vertical_id,net_payout,city,state,last_updated',
-                         where=where)
+                         where=where, order='zip,vertical_id')
 
     vmap = {v['id']: v for v in verticals}
     by_name, by_zip = load_us_cities()

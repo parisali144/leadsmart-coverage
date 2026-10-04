@@ -1439,7 +1439,7 @@ async function toggleNicheZips(r,c,i,tr){
 }
 
 async function exportNiche(){
-  const r=await j('/api/niche?'+nicheParams({offset:0,limit:1000}).toString());
+  const r=await j('/api/niche?'+nicheParams({offset:0,limit:1000000}).toString());
   const head=['rank','city','state','niche','payout_type','payout','avg_payout','zips','population','density','county','score'];
   const lines=[head.join(',')];
   r.cities.forEach((c,i)=>lines.push([i+1,c.city,c.state_id,r.niche,r.payout_type,c.payout,c.avg_payout,c.zips,c.population,c.density,c.county||'',c.score]

@@ -32,7 +32,8 @@ The DB is a CI-only build artifact used to generate the JSON — it is not deplo
 | `netlify-build/index.html` | The whole UI in one file |
 | `netlify-build/data.js` | Fetch layer — maps each `/api/*` call to the precomputed JSON and recomputes row-level views client-side |
 | `netlify-build/api/` | The generated static JSON API (build artifact; git-ignored, rebuilt each run) |
-| `.github/workflows/refresh.yml` | Re-syncs, precomputes, and redeploys daily at 14:00 UTC |
+| `app/check_source.py` | Cheap "has the feed changed?" check — compares the source fingerprint with the live site's |
+| `.github/workflows/refresh.yml` | Polls every 15 min; re-syncs, precomputes, and redeploys whenever the source changes |
 
 ## Local development
 
@@ -48,17 +49,24 @@ python -m http.server 8000
 # → open http://localhost:8000
 ```
 
-## Automated daily refresh
+## Automated refresh (follows the source)
 
-The `Daily data refresh` workflow runs every day at **14:00 UTC** (≈ 9 AM EST,
-1 hour after LeadSmart's 8 AM CST data update). It:
+LeadSmart doesn't update on a fixed clock, so the `Data refresh` workflow
+polls every **15 minutes**. Its `check` job runs `app/check_source.py`, which
+builds a fingerprint of the source (newest `last_updated` | row count | live
+verticals) and compares it to `source_fingerprint` in the live
+`/api/meta.json`. Only when they differ does the `refresh` job run:
 
 1. Runs `python app/sync_supabase.py` to pull the latest rows into `leadsmart.db`.
 2. Runs `python app/precompute.py` to generate the static JSON API.
 3. Bundles the JSON API + static assets into `deploy.zip` (no DB).
 4. Posts that zip to the Netlify Deploy API, replacing the live site.
 
-You can also trigger it manually from the **Actions** tab → `Daily data refresh`
+The site shows the feed's update date with a freshness badge
+("Data updated Oct 23, 2026 · today"). GitHub may delay scheduled runs by a few
+minutes, so a source update typically reaches the site within ~15–30 minutes.
+
+You can also trigger it manually from the **Actions** tab → `Data refresh`
 → `Run workflow`.
 
 ### One-time setup

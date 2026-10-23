@@ -1,16 +1,41 @@
-name: Daily data refresh
+name: Data refresh
 
-# Fires every day at 14:00 UTC (≈ 9:00 AM EST / 8:00 AM CST + 1 hr,
-# giving LeadSmart's 8 AM CST cron a 1-hour buffer to finish).
-# Also runnable on demand from the Actions tab via workflow_dispatch.
+# Mirrors LeadSmart as soon as their feed changes. They don't update on a fixed
+# clock (seen: 14:00 UTC one day, 04:28 UTC the next), so instead of one daily
+# run we poll every 15 minutes with a cheap fingerprint check (newest
+# last_updated | row count | live verticals) and run the full sync + deploy
+# only when it differs from what the live site was built from.
+# workflow_dispatch from the Actions tab always forces a full refresh.
 on:
   schedule:
-    - cron: '0 14 * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
+# Never let two deploys race; a newer run waits for the current one.
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
 jobs:
+  check:
+    name: Has the LeadSmart feed changed?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - id: check
+        working-directory: app
+        run: python check_source.py
+
   refresh:
     name: Sync from Supabase and deploy to Netlify
+    needs: check
+    if: needs.check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 

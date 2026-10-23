@@ -14,7 +14,7 @@ Writes:
 Run:
   python sync_supabase.py
 """
-import sqlite3, csv, json, re, time
+import sqlite3, csv, json, re, time, hashlib
 from urllib.request import Request, urlopen
 from pathlib import Path
 
@@ -210,6 +210,22 @@ def load_us_cities():
     return by_name, by_zip
 
 
+def is_live(v):
+    return bool(v.get('enabled')) and (v.get('group_label') or '') != 'Legal'
+
+
+def source_fingerprint(live_ids, where):
+    """Cheap signature of the source's current state: newest last_updated, row
+    count and the set of live verticals. Any LeadSmart update changes at least
+    one of these, so CI polls this every few minutes and rebuilds only when it
+    differs from the fingerprint the live site was built from."""
+    newest, _ = supa_get(f'top_bids?select=last_updated&{where}'
+                         '&order=last_updated.desc.nullslast&limit=1')
+    newest = (newest[0]['last_updated'] if newest else '') or ''
+    ids = hashlib.sha1(','.join(sorted(live_ids)).encode()).hexdigest()[:10]
+    return f'{newest}|{source_count("top_bids", where=where)}|{ids}'
+
+
 def build():
     print('Sync starting…')
     all_verticals = fetch_all('verticals', columns='id,slug,name,group_label,sort_order,priority,enabled')
@@ -219,8 +235,6 @@ def build():
     # live behind their separate "Facebook Marketplace" toggle, and disabled
     # verticals are hidden). Replicating that predicate makes our row/niche
     # counts equal theirs to the row (verified: 22 verticals, 266,105 rows).
-    def is_live(v):
-        return bool(v.get('enabled')) and (v.get('group_label') or '') != 'Legal'
     verticals = [v for v in all_verticals if is_live(v)]
     live_ids = [v['id'] for v in verticals]
     # PostgREST in-list; UUIDs need no quoting. Applied to both the count and
@@ -229,6 +243,9 @@ def build():
     print(f'  live-view verticals: {len(verticals)}/{len(all_verticals)} '
           f'(excluded {len(all_verticals) - len(verticals)}: disabled + Legal group)')
 
+    # Taken BEFORE the fetch: if LeadSmart updates mid-sync, the stored
+    # fingerprint is the older one, so the next poll sees a change and resyncs.
+    fingerprint = source_fingerprint(live_ids, where)
     source_top_bids = source_count('top_bids', where=where)
     # (zip, vertical_id) is unique per row (one top bid per ZIP per vertical), so
     # it is a total, stable order — the guarantee offset pagination needs to not
@@ -312,6 +329,7 @@ def build():
     # Full timestamps so the UI can show exactly how fresh the data is:
     # data_updated_at = when LeadSmart last changed the feed; synced_at = when we pulled it.
     cur.execute('INSERT INTO meta VALUES (?,?)', ('data_updated_at', freshest or ''))
+    cur.execute('INSERT INTO meta VALUES (?,?)', ('source_fingerprint', fingerprint))
     cur.execute('INSERT INTO meta VALUES (?,?)', ('synced_at', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())))
     cur.execute('INSERT INTO meta VALUES (?,?)', ('source', 'live · affiliate-bid-coverage.leadsmartinc.com'))
     cur.execute('INSERT INTO meta VALUES (?,?)', ('niche_count', str(len(verticals))))

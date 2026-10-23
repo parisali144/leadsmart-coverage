@@ -68,6 +68,12 @@
   .hstat .s{text-align:right}
   .hstat .n{font-size:18px;font-weight:680;font-variant-numeric:tabular-nums}
   .hstat .l{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+  .fresh{display:inline-block;line-height:1.5;margin:2px 0 18px;padding:6px 12px;border:1px solid var(--line2);
+         border-radius:12px;font-size:12.5px;color:var(--ink2);background:var(--panel)}
+  .fresh:empty{display:none}
+  .fresh b{color:var(--ink);font-weight:620;white-space:nowrap}
+  .fresh i{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-align:1px;border-radius:50%;background:var(--good)}
+  .fresh.old i{background:var(--gold)} .fresh.stale i{background:var(--bad)}
 
   .maintabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);
             border-radius:13px;padding:5px;width:fit-content;box-shadow:var(--shadow)}
@@ -584,6 +590,7 @@
   </div>
   <div class="hstat" id="hstat"></div>
 </header>
+<div class="fresh" id="fresh" title=""></div>
 
 <div class="tabs-row">
   <div class="maintabs">
@@ -1640,6 +1647,24 @@ async function renderSaved(){
   document.querySelectorAll('#savedResult .rm').forEach(a=>a.onclick=()=>{toggleSaved(a.dataset.c,a.dataset.s);renderSaved();});
 }
 
+/* Data-freshness: show the date LeadSmart last updated the feed, plus how old
+   that is, so users can tell at a glance whether they're looking at current data. */
+function fmtDate(d,opt){const [y,m,dd]=d.slice(0,10).split('-').map(Number);
+  return new Date(y,m-1,dd).toLocaleDateString('en-US',opt||{month:'short',day:'numeric',year:'numeric'});}
+function renderFresh(){
+  const el=$('#fresh');if(!el||!META.data_date)return;
+  const [y,m,d]=META.data_date.slice(0,10).split('-').map(Number);
+  const now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const age=Math.max(0,Math.round((today-new Date(y,m-1,d))/864e5));
+  const rel=age===0?'today':age===1?'yesterday':`${age} days ago`;
+  el.className='fresh'+(age>=7?' stale':age>=2?' old':'');
+  el.innerHTML=`<i></i>Data updated <b>${fmtDate(META.data_date)}</b> · ${rel}${age>=2?' — may be out of date':''}`;
+  const t=[];
+  if(META.data_updated_at)t.push('LeadSmart feed changed: '+new Date(META.data_updated_at).toLocaleString());
+  if(META.synced_at)t.push('Synced to this site: '+new Date(META.synced_at).toLocaleString());
+  el.title=t.join('\n');
+}
+
 function dl(text,name){const b=new Blob([text],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();}
 
 (async()=>{
@@ -1647,9 +1672,10 @@ function dl(text,name){const b=new Blob([text],{type:'text/csv'});const a=docume
   $('#hstat').innerHTML=`
     <div class="s"><div class="n">${fmt(META.total_cities)}</div><div class="l">Cities</div></div>
     <div class="s"><div class="n">${META.niches.length}</div><div class="l">Niches</div></div>
-    <div class="s"><div class="n">${META.data_date.slice(5)}</div><div class="l">Updated ’25</div></div>`;
+    <div class="s"><div class="n">${fmtDate(META.data_date,{month:'short',day:'numeric'})}</div><div class="l">Updated ${META.data_date.slice(0,4)}</div></div>`;
+  renderFresh();
   const src=META.source||'LeadSmart payouts';
-  $('#foot').innerHTML=`Updated ${META.data_date} · ${fmt(META.total_cities)} cities · ${META.niches.length} niches · synced from ${src} · population & county from US Cities dataset`;
+  $('#foot').innerHTML=`Data updated ${fmtDate(META.data_date)} · ${fmt(META.total_cities)} cities · ${META.niches.length} niches · synced from ${src} · population & county from US Cities dataset`;
   renderRecent();
   renderLanding();
   refreshNicheRef();

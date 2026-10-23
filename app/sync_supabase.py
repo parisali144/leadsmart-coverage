@@ -309,6 +309,10 @@ def build():
 
     data_date = (freshest or '')[:10] or time.strftime('%Y-%m-%d')
     cur.execute('INSERT INTO meta VALUES (?,?)', ('data_date', data_date))
+    # Full timestamps so the UI can show exactly how fresh the data is:
+    # data_updated_at = when LeadSmart last changed the feed; synced_at = when we pulled it.
+    cur.execute('INSERT INTO meta VALUES (?,?)', ('data_updated_at', freshest or ''))
+    cur.execute('INSERT INTO meta VALUES (?,?)', ('synced_at', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())))
     cur.execute('INSERT INTO meta VALUES (?,?)', ('source', 'live · affiliate-bid-coverage.leadsmartinc.com'))
     cur.execute('INSERT INTO meta VALUES (?,?)', ('niche_count', str(len(verticals))))
     # Authoritative source size at sync time + rows we actually wrote. CI gates

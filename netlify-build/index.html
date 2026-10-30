@@ -1688,7 +1688,9 @@ async function refreshNicheRef(){
   const tb=document.querySelector('#nicheRef tbody');if(!tb)return;
   const r=await j('/api/niche_summary');if(!r||r.error||!r.niches)return;
   const map={};r.niches.forEach(x=>{map[x.niche+'|'+x.payout_type]=x;});
-  const rows=[...tb.querySelectorAll('tr')];let updated=0;
+  let rows=[...tb.querySelectorAll('tr')],updated=0;
+  // LeadSmart can disable a niche at any time: don't keep showing its shipped figures
+  rows=rows.filter(tr=>{const live=map[tr.dataset.n+'|'+tr.dataset.t];if(!live)tr.remove();return live;});
   rows.forEach(tr=>{
     const d=map[tr.dataset.n+'|'+tr.dataset.t];if(!d)return;
     const td=tr.querySelectorAll('td');

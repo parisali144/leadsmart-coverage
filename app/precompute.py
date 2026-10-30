@@ -87,7 +87,7 @@ def build_meta(con):
 
 def build_niche_summary(con):
     base = q(con, '''SELECT niche, payout_type,
-              COUNT(DISTINCT zip) AS zips,
+              COUNT(DISTINCT zip) AS zips, COUNT(DISTINCT payout) AS distinct_payouts,
               MIN(payout) AS min, MAX(payout) AS max, AVG(payout) AS avg
             FROM coverage GROUP BY niche, payout_type''')
     med = {}

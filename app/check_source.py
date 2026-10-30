@@ -30,13 +30,19 @@ def live_fingerprint():
 
 
 def main():
-    verticals = [v for v in fetch_all('verticals', columns='id,group_label,enabled')
-                 if is_live(v)]
-    ids = [v['id'] for v in verticals]
-    source = source_fingerprint(ids, 'vertical_id=in.(%s)' % ','.join(ids))
+    try:
+        verticals = [v for v in fetch_all('verticals', columns='id,group_label,enabled')
+                     if is_live(v)]
+        ids = [v['id'] for v in verticals]
+        source = source_fingerprint(ids, 'vertical_id=in.(%s)' % ','.join(ids))
+    except RuntimeError as e:
+        # Supabase times out while LeadSmart is writing its update. That isn't a
+        # failure: skip this poll and the next one will pick up the finished data.
+        print(f'::warning::source busy, skipping this check: {str(e)[-120:]}')
+        source = None
     live = live_fingerprint()
-    changed = source != live
-    print(f'source: {source}\nlive:   {live or "(none)"}\nchanged: {changed}')
+    changed = source is not None and source != live
+    print(f'source: {source or "(unavailable)"}\nlive:   {live or "(none)"}\nchanged: {changed}')
     out = os.environ.get('GITHUB_OUTPUT')
     if out:
         with open(out, 'a') as f:

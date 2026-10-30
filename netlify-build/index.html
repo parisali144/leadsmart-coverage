@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lead Payouts by Niche, City &amp; ZIP — LeadSmart Coverage Intelligence</title>
-<meta name="description" content="Look up what home-service leads pay in any US city or ZIP code. Live payouts and coverage for 20 niches — roofing, HVAC, plumbing, water damage, mold and more.">
+<meta name="description" content="Look up what home-service leads pay in any US city or ZIP code. Live payouts and ZIP coverage by niche — roofing, HVAC, plumbing, water damage, mold and more.">
 <link rel="canonical" href="https://leadsmart-coverage.netlify.app/">
 <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -16,11 +16,11 @@
 <meta property="og:site_name" content="LeadSmart Coverage Intelligence">
 <meta property="og:url" content="https://leadsmart-coverage.netlify.app/">
 <meta property="og:title" content="Lead Payouts by Niche, City &amp; ZIP — LeadSmart Coverage Intelligence">
-<meta property="og:description" content="Look up what home-service leads pay in any US city or ZIP code. Live payouts and coverage for 20 niches across 41,000+ ZIP codes.">
+<meta property="og:description" content="Look up what home-service leads pay in any US city or ZIP code. Live payouts and coverage by niche, down to the individual ZIP code.">
 <meta property="og:image" content="https://leadsmart-coverage.netlify.app/favicon.svg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Lead Payouts by Niche, City &amp; ZIP">
-<meta name="twitter:description" content="What home-service leads actually pay, by city and ZIP — 20 niches, 41,000+ ZIP codes, updated daily.">
+<meta name="twitter:description" content="What home-service leads actually pay, by city and ZIP, kept in sync with the live feed.">
 <meta name="twitter:image" content="https://leadsmart-coverage.netlify.app/favicon.svg">
 <style>
   :root{
@@ -768,10 +768,10 @@
   </div>
 
   <div class="ed-stats">
-    <div class="ed-stat"><div class="n">20</div><div class="l">Niches tracked</div></div>
-    <div class="ed-stat"><div class="n">41,000+</div><div class="l">ZIP codes covered</div></div>
-    <div class="ed-stat"><div class="n">$1&ndash;$507</div><div class="l">Payout range</div></div>
-    <div class="ed-stat"><div class="n">Daily</div><div class="l">Data refresh</div></div>
+    <div class="ed-stat"><div class="n" id="statNiches">17</div><div class="l">Niches tracked</div></div>
+    <div class="ed-stat"><div class="n" id="statZips">40,860</div><div class="l">ZIP codes covered</div></div>
+    <div class="ed-stat"><div class="n" id="statRange">$0.28&ndash;$497.50</div><div class="l">Payout range</div></div>
+    <div class="ed-stat"><div class="n" id="statUpdated">Oct 29</div><div class="l">Last updated</div></div>
   </div>
 
   <div class="ed-sec">
@@ -834,7 +834,7 @@
         <h3>Cost per lead (CPL)</h3>
         <div class="rng" id="rngCPL">Median payouts $38 &ndash; $224</div>
         <p>You&rsquo;re paid when a submitted lead converts to a booked appointment. Payouts are
-        much higher &mdash; restoration niches clear $180&ndash;$500 &mdash; because a lot of raw
+        much higher &mdash; restoration niches pay the most &mdash; because a lot of raw
         leads never make it that far.</p>
       </div>
       <div class="mcard">
@@ -917,17 +917,9 @@
     <h2>Frequently asked questions</h2>
     <div class="faq">
       <details><summary>How much do home-service leads pay?</summary>
-        <div class="ans">It depends heavily on the niche. In this network, restoration work pays
-        most &mdash; biohazard cleanup, fire damage and water damage all sit near $190&ndash;$210 at
-        the median and reach $500 in the strongest ZIP codes. Remodeling niches such as kitchens,
-        siding and windows run roughly $100&ndash;$120. Trade call niches such as plumbing, HVAC and
-        roofing typically pay $30&ndash;$45 per qualified call, and appliance repair is the cheapest
-        at around $5.50.</div></details>
+        <div class="ans">It depends heavily on the niche and the ZIP code. In this network, restoration work such as biohazard cleanup, fire damage and water damage usually pays the most per lead. Trade call niches such as plumbing, HVAC and roofing pay much less per qualified call, and appliance repair is usually among the lowest. Current medians and ranges for every niche are in the payout table on this page.</div></details>
       <details><summary>Which lead generation niche pays the most?</summary>
-        <div class="ans">By median payout, biohazard cleanup is the highest at about $210 per lead,
-        followed by fire damage removal and water damage restoration. Water damage has the single
-        highest payout of any ZIP code in the network at $507. These are all cost-per-lead niches,
-        so payout is only earned on a booked appointment.</div></details>
+        <div class="ans">Restoration niches lead by median payout: biohazard cleanup, fire damage removal and water damage restoration. The payout table on this page shows the current ranking and the range in each niche. These are cost-per-lead niches, so payout is only earned on a booked appointment.</div></details>
       <details><summary>How do I check whether my city or ZIP code is covered?</summary>
         <div class="ans">Use the &ldquo;By city&rdquo; search at the top of this page. Enter a city
         name or a five-digit ZIP code and you&rsquo;ll see every niche bought in that market with
@@ -939,22 +931,16 @@
         that lasts past a minimum duration, so payouts are smaller but a much larger share of
         traffic qualifies. The two models can&rsquo;t be compared on payout alone.</div></details>
       <details><summary>How often is the data updated?</summary>
-        <div class="ans">Coverage and payouts are pulled from LeadSmart&rsquo;s live feed once every
-        day and the site is rebuilt automatically. The exact date of the current dataset is shown at
-        the bottom of this page.</div></details>
+        <div class="ans">Coverage and payouts come from LeadSmart&rsquo;s live feed. The site checks that feed automatically several times a day and rebuilds when it changes. The date of the current dataset is shown at the top and bottom of this page.</div></details>
       <details><summary>Does a high payout mean it&rsquo;s a good market?</summary>
-        <div class="ans">No. Payout is only the revenue side. A market is worth entering when payout
-        times conversion rate exceeds your cost to acquire the traffic, which depends on search
-        volume, cost per click and how strong the existing local competition is. Several niches here
-        also pay a flat rate nationwide, so ranking their cities by payout tells you nothing at
-        all.</div></details>
+        <div class="ans">No. Payout is only the revenue side. A market is worth entering when payout times conversion rate exceeds your cost to acquire the traffic, which depends on search volume, cost per click and how strong the existing local competition is. Some niches here also pay nearly the same rate everywhere, so ranking their cities by payout tells you very little.</div></details>
     </div>
   </div>
 
   <div class="ed-fine">
     <p><b>Where the data comes from.</b> Coverage and payout figures come from LeadSmart&rsquo;s
-    public affiliate bid feed and are resynchronised daily. City, county, population and density are
-    matched from the SimpleMaps US Cities dataset (CC BY 4.0); roughly 13% of ZIP codes in the feed
+    public affiliate bid feed and are resynchronised automatically when the feed changes. City, county, population and density are
+    matched from the SimpleMaps US Cities dataset (CC BY 4.0); roughly 20% of ZIP codes in the feed
     are administrative or PO-box ZIPs with no matching city record, and those show no population
     figure.</p>
     <p><b>Fair warning.</b> Payouts shown are net payouts to the affiliate, before any traffic cost.
@@ -1671,6 +1657,9 @@ function dl(text,name){const b=new Blob([text],{type:'text/csv'});const a=docume
     <div class="s"><div class="n">${META.niches.length}</div><div class="l">Niches</div></div>
     <div class="s"><div class="n">${fmtDate(META.data_date,{month:'short',day:'numeric'})}</div><div class="l">Updated ${META.data_date.slice(0,4)}</div></div>`;
   renderFresh();
+  $('#statNiches').textContent=META.niches.length;
+  if(META.total_zips)$('#statZips').textContent=fmt(META.total_zips);
+  $('#statUpdated').textContent=fmtDate(META.data_date,{month:'short',day:'numeric'});
   const src=META.source||'LeadSmart payouts';
   $('#foot').innerHTML=`Data updated ${fmtDate(META.data_date)} · ${fmt(META.total_cities)} cities · ${META.niches.length} niches · synced from ${src} · population & county from US Cities dataset`;
   renderRecent();
@@ -1747,6 +1736,9 @@ async function refreshNicheRef(){
 
   renderPayoutCopy(r.niches);
 
+  const ns=r.niches.map(d=>[d.min,d.max]).flat(),setText=(sel,t)=>{const el=$(sel);if(el)el.textContent=t;};
+  setText('#statRange',`${usd(Math.min(...ns))}–${usd(Math.max(...ns))}`);
+
   const note=$('#nicheRefNote');
   if(note&&META&&META.data_date)note.textContent=`Live figures as of ${META.data_date}. Median = the middle ZIP code for that niche, not the highest.`;
 }
@@ -1763,8 +1755,8 @@ async function refreshNicheRef(){
       "url": "https://leadsmart-coverage.netlify.app/",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Any (web browser)",
-      "browserRequirements": "Requires JavaScript and WebAssembly",
-      "description": "Look up what home-service leads pay in any US city or ZIP code. Live payouts and coverage for 20 niches across more than 41,000 ZIP codes, updated daily.",
+      "browserRequirements": "Requires JavaScript",
+      "description": "Look up what home-service leads pay in any US city or ZIP code. Live payouts and coverage by niche, down to the individual ZIP code, kept in sync with the live feed.",
       "offers": {
         "@type": "Offer",
         "price": "0",
@@ -1783,7 +1775,7 @@ async function refreshNicheRef(){
       "@type": "Dataset",
       "@id": "https://leadsmart-coverage.netlify.app/#dataset",
       "name": "US home-service lead payouts and ZIP code coverage",
-      "description": "Net affiliate payouts and ZIP-level buying coverage for 20 home-improvement and restoration lead niches across the United States, refreshed daily from LeadSmart's public bid feed and enriched with city, county and population data.",
+      "description": "Net affiliate payouts and ZIP-level buying coverage for home-improvement and restoration lead niches across the United States, refreshed automatically from LeadSmart's public bid feed and enriched with city, county and population data.",
       "url": "https://leadsmart-coverage.netlify.app/",
       "keywords": [
         "lead generation",
@@ -1814,7 +1806,7 @@ async function refreshNicheRef(){
           "name": "How much do home-service leads pay?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "It depends heavily on the niche. In this network, restoration work pays most — biohazard cleanup, fire damage and water damage all sit near $190–$210 at the median and reach $500 in the strongest ZIP codes. Remodeling niches such as kitchens, siding and windows run roughly $100–$120. Trade call niches such as plumbing, HVAC and roofing typically pay $30–$45 per qualified call, and appliance repair is the cheapest at around $5.50."
+            "text": "It depends heavily on the niche and the ZIP code. In this network, restoration work such as biohazard cleanup, fire damage and water damage usually pays the most per lead. Trade call niches such as plumbing, HVAC and roofing pay much less per qualified call, and appliance repair is usually among the lowest. Current medians and ranges for every niche are in the payout table on this page."
           }
         },
         {
@@ -1822,7 +1814,7 @@ async function refreshNicheRef(){
           "name": "Which lead generation niche pays the most?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "By median payout, biohazard cleanup is the highest at about $210 per lead, followed by fire damage removal and water damage restoration. Water damage has the single highest payout of any ZIP code in the network at $507. These are all cost-per-lead niches, so payout is only earned on a booked appointment."
+            "text": "Restoration niches lead by median payout: biohazard cleanup, fire damage removal and water damage restoration. The payout table on this page shows the current ranking and the range in each niche. These are cost-per-lead niches, so payout is only earned on a booked appointment."
           }
         },
         {
@@ -1846,7 +1838,7 @@ async function refreshNicheRef(){
           "name": "How often is the data updated?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Coverage and payouts are pulled from LeadSmart’s live feed once every day and the site is rebuilt automatically. The exact date of the current dataset is shown at the bottom of this page."
+            "text": "Coverage and payouts come from LeadSmart’s live feed. The site checks that feed automatically several times a day and rebuilds when it changes. The date of the current dataset is shown at the top and bottom of this page."
           }
         },
         {
@@ -1854,7 +1846,7 @@ async function refreshNicheRef(){
           "name": "Does a high payout mean it’s a good market?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "No. Payout is only the revenue side. A market is worth entering when payout times conversion rate exceeds your cost to acquire the traffic, which depends on search volume, cost per click and how strong the existing local competition is. Several niches here also pay a flat rate nationwide, so ranking their cities by payout tells you nothing at all."
+            "text": "No. Payout is only the revenue side. A market is worth entering when payout times conversion rate exceeds your cost to acquire the traffic, which depends on search volume, cost per click and how strong the existing local competition is. Some niches here also pay nearly the same rate everywhere, so ranking their cities by payout tells you very little."
           }
         }
       ]

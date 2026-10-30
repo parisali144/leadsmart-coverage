@@ -72,6 +72,7 @@ def build_meta(con):
     meta['total_cities'] = con.execute(
         'SELECT COUNT(DISTINCT city||"|"||state_id) FROM coverage '
         'WHERE city IS NOT NULL AND state_id IS NOT NULL').fetchone()[0]
+    meta['total_zips'] = con.execute('SELECT COUNT(DISTINCT zip) FROM coverage').fetchone()[0]
     meta['niches'] = [r['niche'] for r in q(
         con, 'SELECT DISTINCT niche FROM coverage ORDER BY niche')]
     nt = {}

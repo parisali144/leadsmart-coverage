@@ -33,7 +33,7 @@ The DB is a CI-only build artifact used to generate the JSON — it is not deplo
 | `netlify-build/data.js` | Fetch layer — maps each `/api/*` call to the precomputed JSON and recomputes row-level views client-side |
 | `netlify-build/api/` | The generated static JSON API (build artifact; git-ignored, rebuilt each run) |
 | `app/check_source.py` | Cheap "has the feed changed?" check — compares the source fingerprint with the live site's |
-| `.github/workflows/refresh.yml` | Polls every 15 min; re-syncs, precomputes, and redeploys whenever the source changes |
+| `.github/workflows/refresh.yml` | Polls on a schedule; re-syncs, precomputes, and redeploys whenever the source changes |
 
 ## Local development
 
@@ -52,7 +52,7 @@ python -m http.server 8000
 ## Automated refresh (follows the source)
 
 LeadSmart doesn't update on a fixed clock, so the `Data refresh` workflow
-polls every **15 minutes**. Its `check` job runs `app/check_source.py`, which
+polls on a schedule (see below for real timing). Its `check` job runs `app/check_source.py`, which
 builds a fingerprint of the source (newest `last_updated` | row count | live
 verticals) and compares it to `source_fingerprint` in the live
 `/api/meta.json`. Only when they differ does the `refresh` job run:
@@ -63,8 +63,10 @@ verticals) and compares it to `source_fingerprint` in the live
 4. Posts that zip to the Netlify Deploy API, replacing the live site.
 
 The site shows the feed's update date with a freshness badge
-("Data updated Oct 23, 2026 · today"). GitHub may delay scheduled runs by a few
-minutes, so a source update typically reaches the site within ~15–30 minutes.
+("Data updated Oct 23, 2026 · today"). The cron asks for every 15 minutes, but
+GitHub throttles scheduled runs: real gaps are about 2–6 hours, so that is how
+long a source update can take to reach the site. Run the workflow by hand to
+update sooner.
 
 You can also trigger it manually from the **Actions** tab → `Data refresh`
 → `Run workflow`.

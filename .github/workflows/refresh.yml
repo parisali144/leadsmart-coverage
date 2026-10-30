@@ -1,10 +1,10 @@
 name: Data refresh
 
-# Mirrors LeadSmart as soon as their feed changes. They don't update on a fixed
-# clock (seen: 14:00 UTC one day, 04:28 UTC the next), so instead of one daily
-# run we poll every 15 minutes with a cheap fingerprint check (newest
+# Follows LeadSmart's feed. They don't update on a fixed clock (seen: 14:00 UTC
+# one day, 04:28 UTC the next), so we poll with a cheap fingerprint check (newest
 # last_updated | row count | live verticals) and run the full sync + deploy
-# only when it differs from what the live site was built from.
+# only when it differs from what the live site was built from. The cron asks for
+# every 15 minutes, but GitHub throttles it: real gaps are ~2-6 hours.
 # workflow_dispatch from the Actions tab always forces a full refresh.
 on:
   schedule:
@@ -83,7 +83,10 @@ jobs:
           print(f'niches={niches}  coverage_rows={rows:,}  source_top_bids={source:,}')
 
           # Absolute sanity floors — a totally broken sync fails regardless of source.
-          assert niches >= 18, f'Aborting: only {niches} niches (expected 18+)'
+          # Keep this floor far below the real count: LeadSmart enables/disables
+          # niches at will (23 -> 17 in Oct 2026), and a floor near the current
+          # count blocks correct data, leaving the site stale until someone edits it.
+          assert niches >= 10, f'Aborting: only {niches} niches (expected 10+)'
           assert rows >= 100_000, \
               f'Aborting: only {rows:,} rows (expected 100k+, likely a truncated fetch)'
 

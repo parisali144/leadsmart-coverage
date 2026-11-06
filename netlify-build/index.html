@@ -957,6 +957,8 @@
 <script>
 const $=s=>document.querySelector(s);
 const fmt=n=>n==null?'—':Number(n).toLocaleString();
+// ZIPs are stored as integers, so 01970 arrives as 1970: always show five digits
+const zip5=z=>z==null?'':String(z).padStart(5,'0');
 const usd=n=>n==null?'—':'$'+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const usd0=n=>n==null?'—':'$'+Number(n).toLocaleString(undefined,{maximumFractionDigits:0});
 /* j() is defined by data.js (sql.js client-side data layer) */
@@ -1090,7 +1092,7 @@ function renderCity(){
      ${presets.map(p=>`<button data-k="${p[0]}" class="${SORT.key===p[0]?'on':''}">${p[1]}</button>`).join('')}
    </div></div>`;
   if(d.bundles){const b=d.bundles;
-    h+=`<div class="bundle"><h3>Bundle opportunity — ZIP ${b.zip}</h3>
+    h+=`<div class="bundle"><h3>Bundle opportunity — ZIP ${zip5(b.zip)}</h3>
       <div class="combo">${b.stack.map(s=>`${s.niche} <b>${usd(s.payout)}</b>`).join('  +  ')}
        &nbsp;→ stacked <b>${usd(b.combined)}</b> per shared lead · ${b.count} niches cover this ZIP</div></div>`;}
   h+=`<div class="tablecard"><table><thead><tr>
@@ -1141,19 +1143,19 @@ async function toggleCityZips(d,n,i,tr){
   const r=await fetchCityZips(d,n);
   const maxP=r.max||1;
   const chips=r.zips.map(z=>{const pct=Math.round(100*z.payout/maxP);
-    return `<div class="zchip"><span class="zc-zip">${z.zip}</span><span class="zc-bar" style="width:${Math.max(6,pct*0.5)}px"></span><span class="zc-pay">${usd(z.payout)}</span></div>`;}).join('');
+    return `<div class="zchip"><span class="zc-zip">${zip5(z.zip)}</span><span class="zc-bar" style="width:${Math.max(6,pct*0.5)}px"></span><span class="zc-pay">${usd(z.payout)}</span></div>`;}).join('');
   row.querySelector('.zwrap').innerHTML=
     `<div class="zhead">${r.count} ZIP${r.count>1?'s':''} for ${n.niche} (${n.payout_type}) · ${r.min<r.max?`${usd(r.min)}–${usd(r.max)}`:usd(r.max)}
        <span class="zcopy" data-i="${i}">copy ZIPs</span></div><div class="zgrid">${chips}</div>`;
   const cp=row.querySelector('.zcopy');
-  if(cp)cp.onclick=()=>{navigator.clipboard.writeText(r.zips.map(z=>z.zip).join('\n')).then(()=>toast(`Copied ${r.count} ZIPs`));};
+  if(cp)cp.onclick=()=>{navigator.clipboard.writeText(r.zips.map(z=>zip5(z.zip)).join('\n')).then(()=>toast(`Copied ${r.count} ZIPs`));};
 }
 async function exportCityZips(d,niches){
   const all=await Promise.all(niches.map(n=>fetchCityZips(d,n)));
   const head=['city','state','county','niche','payout_type','zip','payout'];
   const lines=[head.join(',')];
   all.forEach((r,idx)=>{const n=niches[idx];
-    r.zips.forEach(z=>lines.push([d.city,d.state,d.county||'',n.niche,n.payout_type,z.zip,z.payout]
+    r.zips.forEach(z=>lines.push([d.city,d.state,d.county||'',n.niche,n.payout_type,zip5(z.zip),z.payout]
       .map(v=>`"${(''+(v==null?'':v)).replace(/"/g,'""')}"`).join(',')));});
   dl(lines.join('\n'),`leadsmart_${d.city.replace(/\s+/g,'_')}_${d.state}_ZIPS.csv`);
   toast('Exported per-ZIP CSV');}
@@ -1420,12 +1422,12 @@ async function toggleNicheZips(r,c,i,tr){
   const data=await j(`/api/zips?city=${encodeURIComponent(c.city)}&state=${encodeURIComponent(c.state_id)}&niche=${encodeURIComponent(r.niche)}&ptype=${encodeURIComponent(r.payout_type)}`);
   const maxP=data.max||1;
   const chips=data.zips.map(z=>{const pct=Math.round(100*z.payout/maxP);
-    return `<div class="zchip"><span class="zc-zip">${z.zip}</span><span class="zc-bar" style="width:${Math.max(6,pct*0.5)}px"></span><span class="zc-pay">${usd(z.payout)}</span></div>`;}).join('');
+    return `<div class="zchip"><span class="zc-zip">${zip5(z.zip)}</span><span class="zc-bar" style="width:${Math.max(6,pct*0.5)}px"></span><span class="zc-pay">${usd(z.payout)}</span></div>`;}).join('');
   row.querySelector('.zwrap').innerHTML=
     `<div class="zhead">${data.count} ZIP${data.count>1?'s':''} for ${c.city}, ${c.state_id} — ${r.niche} (${r.payout_type}) · ${data.min<data.max?`${usd(data.min)}–${usd(data.max)}`:usd(data.max)}
        <span class="zcopy">copy ZIPs</span></div><div class="zgrid">${chips}</div>`;
   const cp=row.querySelector('.zcopy');
-  if(cp)cp.onclick=(e)=>{e.stopPropagation();navigator.clipboard.writeText(data.zips.map(z=>z.zip).join('\n')).then(()=>toast(`Copied ${data.count} ZIPs`));};
+  if(cp)cp.onclick=(e)=>{e.stopPropagation();navigator.clipboard.writeText(data.zips.map(z=>zip5(z.zip)).join('\n')).then(()=>toast(`Copied ${data.count} ZIPs`));};
 }
 
 async function exportNiche(){
@@ -1532,7 +1534,7 @@ function renderStateZipDetail(st,n,data,showAll){
       <span class="dist-n">${fmt(t.zips)} ZIP${t.zips>1?'s':''}</span></div>`).join('');
   // ZIP chips (default: lowest payout first — the floor). Cap to 300 unless showAll.
   const list=showAll?data.zips:data.zips.slice(0,300);
-  const chips=list.map(z=>`<div class="zchip"><span class="zc-zip">${z.zip}</span>${z.city?`<span class="zc-city">${z.city}</span>`:''}<span class="zc-bar" style="width:${Math.max(6,Math.round(100*z.payout/maxP*0.5))}px"></span><span class="zc-pay">${usd(z.payout)}</span></div>`).join('');
+  const chips=list.map(z=>`<div class="zchip"><span class="zc-zip">${zip5(z.zip)}</span>${z.city?`<span class="zc-city">${z.city}</span>`:''}<span class="zc-bar" style="width:${Math.max(6,Math.round(100*z.payout/maxP*0.5))}px"></span><span class="zc-pay">${usd(z.payout)}</span></div>`).join('');
   const more=(!showAll&&data.zips.length>300)?`<div class="zmore"><span class="zmore-link" data-act="all">Show all ${fmt(data.count)} ZIPs ↓</span></div>`:'';
   return `<div class="szhead">
       <b>${n.niche} (${n.payout_type})</b> across ${st}
@@ -1552,11 +1554,11 @@ function wireStateZipDetail(row,st,n,data){
   const rerender=(showAll)=>{row.querySelector('.zwrap').innerHTML=renderStateZipDetail(st,n,data,showAll);wireStateZipDetail(row,st,n,data);};
   row.querySelectorAll('[data-act]').forEach(el=>el.onclick=e=>{
     e.stopPropagation();const act=el.dataset.act;
-    if(act==='copy'){navigator.clipboard.writeText(data.zips.map(z=>z.zip).join('\n')).then(()=>toast(`Copied ${data.count} ZIPs`));}
+    if(act==='copy'){navigator.clipboard.writeText(data.zips.map(z=>zip5(z.zip)).join('\n')).then(()=>toast(`Copied ${data.count} ZIPs`));}
     else if(act==='csv'){
       const head=['zip','city','state','niche','payout_type','payout'];
       const lines=[head.join(',')];
-      data.zips.forEach(z=>lines.push([z.zip,z.city||'',st,n.niche,n.payout_type,z.payout].map(v=>`"${(''+(v==null?'':v)).replace(/"/g,'""')}"`).join(',')));
+      data.zips.forEach(z=>lines.push([zip5(z.zip),z.city||'',st,n.niche,n.payout_type,z.payout].map(v=>`"${(''+(v==null?'':v)).replace(/"/g,'""')}"`).join(',')));
       dl(lines.join('\n'),`leadsmart_${st}_${n.niche.replace(/\s+/g,'_')}_${n.payout_type}_ZIPS.csv`);toast('Exported CSV');
     }
     else if(act==='all'){rerender(true);}
@@ -1590,7 +1592,7 @@ async function loadBundles(){
     const stack=c.stack.map(s=>`${s.niche} ${usd0(s.payout)}`).join(' · ');
     h+=`<tr><td class="rank">${i+1}</td>
       <td><span class="citylink" data-c="${c.city}" data-s="${c.state_id}">${c.city}</span></td>
-      <td>${c.state_id}</td><td class="num dim">${c.zip}</td>
+      <td>${c.state_id}</td><td class="num dim">${zip5(c.zip)}</td>
       <td class="num"><b>${c.niche_count}</b></td>
       <td class="num"><span class="pay" style="color:var(--acc)">${usd(c.combined)}</span></td>
       <td class="opt dim" style="font-size:12.5px">${stack}</td>
